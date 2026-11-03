@@ -1,19 +1,21 @@
 import "server-only";
 import { createBot } from "./bots";
-import { getState, update } from "./store";
+import { getState, update, addMessage } from "./store";
+import { botChatId } from "@/lib/types";
 import { AGENCY_TEAM } from "@/lib/agency-config";
-import { getJob, updateJobStatus, updateStageStatus, addApprovalGate } from "./jobs";
+import { getJob, updateJobStatus, updateStageStatus, addApprovalGate, processApproval } from "./jobs";
 import type { AgencyJob } from "@/lib/job-types";
 import { trackServerEvent } from "./analytics";
+import { askFor, type AskSpec } from "./permission";
 
 /**
  * Installer.report Agency Integration
  * 
  * Wires jobs and workflows into Bops' existing bot system:
  * - Seeds agency bots
- * - Dispatches jobs as bot tasks
+ * - Dispatches jobs as real bot chat messages
  * - Hooks approval gates into Bops' approval UI
- * - Advances workflow stages on bot handoffs
+ * - Advances workflow stages on bot completion
  */
 
 /**
@@ -41,6 +43,13 @@ export async function seedAgencyBots(): Promise<{
     
     if (existingBot) {
       existing.push(existingBot.id);
+      // Store mapping
+      update((s) => {
+        if (!s.agencyBotMappings) {
+          s.agencyBotMappings = {};
+        }
+        s.agencyBotMappings[agencyBot.id] = existingBot.id;
+      });
       continue;
     }
     
@@ -85,8 +94,8 @@ export function getAgencyBotId(agencyBotId: string): string | null {
 }
 
 /**
- * Dispatch job to bot
- * Creates a message in the bot's chat to start work on this job
+ * Dispatch job to bot by posting a real message to its chat
+ * This triggers the bot to actually work on the job
  */
 export async function dispatchJobToBot(
   jobId: string,
@@ -105,17 +114,19 @@ export async function dispatchJobToBot(
   const b = state.bots.find(bot => bot.id === agencyBotId);
   if (!b) throw new Error(`Bot not found: ${agencyBotId}`);
   
-  // Create task message for bot
-  const taskDescription = formatJobForBot(job, stageName);
+  const chatId = botChatId(agencyBotId);
   
-  // Add message to bot's chat
-  // This will trigger the bot to start working on this job
-  // The bot's system prompt (from agency-config.ts) will guide its work
+  // Format task for bot
+  const taskMessage = formatJobTaskMessage(job, stageName);
   
-  // TODO: Wire to Bops' session/task creation
-  // For now, log the dispatch
-  console.log(`[agency] Dispatching job ${jobId} to bot ${b.name} for stage ${stageName}`);
-  console.log(`[agency] Task: ${taskDescription}`);
+  // Post message to bot's chat (triggers bot to work)
+  addMessage({
+    chatId,
+    from: 'user' as const,
+    text: taskMessage,
+  } as any);
+  
+  console.log(`[agency] Dispatched job ${jobId} to bot ${b.name} (${chatId}) for stage ${stageName}`);
   
   trackServerEvent("bops_job_dispatched" as any, {
     job_id: jobId,
@@ -125,59 +136,64 @@ export async function dispatchJobToBot(
 }
 
 /**
- * Format job details for bot task
+ * Format job details as a task message for the bot
  */
-function formatJobForBot(job: AgencyJob, stageName: string): string {
-  return `
-**Job: ${job.projectTitle}**
-
-Client: ${job.clientName}
-Type: ${job.projectType}
-Vertical: ${job.vertical}
-
-**Your Task (${stageName}):**
-
-${formatBriefForStage(job, stageName)}
-
-**Deliverables:**
-${job.brief.deliverables.map((d: string) => `- ${d}`).join('\n')}
-
-**Budget:** ${job.budgetCents ? `$${(job.budgetCents / 100).toFixed(2)}` : 'Not specified'}
-
-Job ID: ${job.id}
-`.trim();
-}
-
-/**
- * Format job brief for specific stage
- */
-function formatBriefForStage(job: AgencyJob, stageName: string): string {
-  const brief = job.brief;
-  
+function formatJobTaskMessage(job: AgencyJob, stageName: string): string {
   const parts = [
-    `Goals: ${brief.goals}`,
+    `# New Job: ${job.projectTitle}`,
+    ``,
+    `**Client:** ${job.clientName}`,
+    `**Type:** ${job.projectType}`,
+    `**Vertical:** ${job.vertical}`,
+    ``,
+    `## Your Task: ${stageName}`,
+    ``,
+    `**Goals:**`,
+    job.brief.goals,
+    ``,
   ];
   
-  if (brief.audience) parts.push(`Audience: ${brief.audience}`);
-  if (brief.style) parts.push(`Style: ${brief.style}`);
+  if (job.brief.audience) {
+    parts.push(`**Audience:** ${job.brief.audience}`, ``);
+  }
+  
+  if (job.brief.style) {
+    parts.push(`**Style:** ${job.brief.style}`, ``);
+  }
+  
+  parts.push(
+    `**Deliverables:**`,
+    ...job.brief.deliverables.map((d: string) => `- ${d}`),
+    ``
+  );
+  
+  if (job.budgetCents) {
+    parts.push(`**Budget:** $${(job.budgetCents / 100).toFixed(2)}`, ``);
+  }
+  
+  parts.push(
+    `---`,
+    `Job ID: ${job.id}`,
+    `Stage: ${stageName}`
+  );
   
   return parts.join('\n');
 }
 
 /**
  * Handle bot completion of stage
- * Called when bot finishes its work and hands off
+ * Detects when bot completes and advances to next stage
  */
 export async function handleStageCompletion(
   jobId: string,
   botId: string,
-  _outputs?: Array<{ filename: string; url: string; type: string }>
+  outputs?: Array<{ filename: string; url: string; type: string }>
 ): Promise<void> {
   const job = await getJob(jobId);
   if (!job) throw new Error('Job not found');
   
   // Mark current stage as completed
-  await updateStageStatus(jobId, botId, 'completed', []);
+  await updateStageStatus(jobId, botId, 'completed', outputs as any);
   
   // Find next stage
   const currentIndex = job.workflow.findIndex(s => s.botId === botId);
@@ -203,8 +219,8 @@ export async function handleStageCompletion(
 }
 
 /**
- * Create approval gate in job and surface in bot chat
- * Hooks into Bops' existing approval UI (askFor from permission.ts)
+ * Create approval gate and route through Bops' askFor() UI
+ * Returns the approval ID and pauses execution
  */
 export async function createJobApproval(
   jobId: string,
@@ -213,6 +229,12 @@ export async function createJobApproval(
   description: string,
   estimatedCost?: number
 ): Promise<string> {
+  const agencyBotId = getAgencyBotId(botId);
+  if (!agencyBotId) {
+    throw new Error(`Agency bot not found: ${botId}`);
+  }
+  
+  // Create approval gate in job
   const approvalId = await addApprovalGate(jobId, {
     type: estimatedCost ? 'spend' : 'deliverable',
     title,
@@ -222,22 +244,59 @@ export async function createJobApproval(
     estimatedCost,
   });
   
-  // TODO: Wire to Bops' askFor() to show in chat
-  // For now, just log
+  // Create Bops approval request (shows in UI)
+  const askSpec: AskSpec = {
+    action: title,
+    resources: [description],
+    preview: estimatedCost ? `Cost: $${(estimatedCost / 100).toFixed(2)}` : undefined,
+    kind: estimatedCost ? 'data' : undefined,
+  };
+  
+  const chatId = botChatId(agencyBotId);
+  
+  // Route through Bops' approval system
+  const approval = askFor(
+    askSpec,
+    { botId: agencyBotId, chatId },
+    {
+      type: 'approval',
+      approvalId,
+      jobId,
+    } as any
+  );
+  
   console.log(`[agency] Approval gate created: ${title}`);
-  console.log(`[agency] Job: ${jobId}, Bot: ${botId}`);
-  if (estimatedCost) {
-    console.log(`[agency] Estimated cost: $${(estimatedCost / 100).toFixed(2)}`);
-  }
+  console.log(`[agency] Job: ${jobId}, Bot: ${botId}, Approval: ${approval.id}`);
   
   trackServerEvent("bops_approval_created" as any, {
     job_id: jobId,
-    bot_id: botId,
+    bot_id: agencyBotId,
     type: estimatedCost ? 'spend' : 'deliverable',
     cost_cents: estimatedCost,
   });
   
   return approvalId;
+}
+
+/**
+ * Handle approval response from Bops UI
+ * Resumes job workflow after user approves/rejects
+ */
+export async function handleApprovalResponse(
+  approvalId: string,
+  approved: boolean,
+  feedback?: string
+): Promise<void> {
+  await processApproval(approvalId, approved, feedback);
+  
+  // Find job and resume workflow if approved
+  if (approved) {
+    // TODO: Resume bot execution
+    // For now, just log
+    console.log(`[agency] Approval ${approvalId} approved, resuming workflow`);
+  } else {
+    console.log(`[agency] Approval ${approvalId} rejected: ${feedback || 'No feedback'}`);
+  }
 }
 
 /**

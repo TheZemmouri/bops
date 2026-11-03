@@ -1,17 +1,16 @@
 import "server-only";
-import type { AgencyJob, JobStatus, StageStatus, ApprovalGate, JobAsset, WorkflowStage } from "@/lib/job-types";
+import type { AgencyJob, JobStatus, StageStatus, ApprovalGate, JobAsset } from "@/lib/job-types";
 import { getWorkflow } from "@/lib/agency-config";
 import { getState } from "./store";
 import { trackServerEvent } from "./analytics";
+import { query } from "./db";
 
 /**
- * Installer.report Job Management (In-Memory)
+ * Installer.report Job Management (Database-backed)
  * 
- * Simplified in-memory implementation for Phase 3 integration.
- * TODO: Replace with database persistence when ready.
+ * Full database persistence using Bops Postgres connection.
+ * Migration: db/migrations/0019_agency_jobs.sql
  */
-
-const jobStore = new Map<string, AgencyJob>();
 
 function generateJobId(): string {
   return `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -42,11 +41,11 @@ export async function createJob(params: {
   const now = new Date().toISOString();
   
   const workflowBotIds = getWorkflow(params.projectType);
-  const workflow: WorkflowStage[] = workflowBotIds.map((botId, index) => ({
+  const workflow = workflowBotIds.map((botId, index) => ({
     botId,
     stageName: botId.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" "),
     stageOrder: index,
-    status: index === 0 ? "in_progress" : "pending",
+    status: index === 0 ? "in_progress" as const : "pending" as const,
     outputs: [],
   }));
   
@@ -59,12 +58,7 @@ export async function createJob(params: {
     projectTitle: params.projectTitle,
     projectType: params.projectType as any,
     vertical: params.vertical as any,
-    brief: {
-      goals: params.brief.goals,
-      audience: params.brief.audience || '',
-      style: params.brief.style,
-      deliverables: params.brief.deliverables,
-    } as any,
+    brief: params.brief as any,
     budgetCents: params.budgetCents,
     status: "intake",
     currentStage: workflowBotIds[0],
@@ -79,7 +73,21 @@ export async function createJob(params: {
     updatedAt: now,
   };
   
-  jobStore.set(job.id, job);
+  // Insert into database
+  await query(
+    `INSERT INTO bops.agency_jobs (
+      id, user_id, workspace_id, client_name, client_email,
+      project_title, project_type, vertical, brief, budget_cents,
+      status, current_stage, assigned_to, workflow,
+      created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+    [
+      job.id, job.userId, job.workspaceId, job.clientName, job.clientEmail,
+      job.projectTitle, job.projectType, job.vertical, JSON.stringify(job.brief), job.budgetCents,
+      job.status, job.currentStage, job.assignedTo, JSON.stringify(job.workflow),
+      job.createdAt, job.updatedAt
+    ]
+  );
   
   trackServerEvent("bops_job_created" as any, {
     job_id: jobId,
@@ -92,7 +100,40 @@ export async function createJob(params: {
 }
 
 export async function getJob(jobId: string): Promise<AgencyJob | null> {
-  return jobStore.get(jobId) || null;
+  const result = await query<any>(
+    `SELECT * FROM bops.agency_jobs WHERE id = $1`,
+    [jobId]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    clientName: row.client_name,
+    clientEmail: row.client_email,
+    projectTitle: row.project_title,
+    projectType: row.project_type,
+    vertical: row.vertical,
+    brief: row.brief,
+    budgetCents: row.budget_cents,
+    timeline: row.timeline,
+    status: row.status,
+    currentStage: row.current_stage,
+    assignedTo: row.assigned_to,
+    workflow: row.workflow,
+    sourceAssets: row.source_assets || [],
+    deliverables: row.deliverables || [],
+    approvalGates: row.approval_gates || [],
+    totalCostCents: Number(row.total_cost_cents) || 0,
+    providerUsage: row.provider_usage || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+    notes: row.notes,
+  };
 }
 
 export async function listJobs(filters?: {
@@ -100,24 +141,56 @@ export async function listJobs(filters?: {
   vertical?: string;
   clientName?: string;
 }): Promise<AgencyJob[]> {
-  let jobs = Array.from(jobStore.values());
+  let whereClause = 'WHERE 1=1';
+  const params: any[] = [];
+  let paramIndex = 1;
   
   if (filters?.status) {
-    jobs = jobs.filter(j => j.status === filters.status);
+    whereClause += ` AND status = $${paramIndex++}`;
+    params.push(filters.status);
   }
   
   if (filters?.vertical) {
-    jobs = jobs.filter(j => j.vertical === filters.vertical);
+    whereClause += ` AND vertical = $${paramIndex++}`;
+    params.push(filters.vertical);
   }
   
   if (filters?.clientName) {
-    const lowerName = filters.clientName.toLowerCase();
-    jobs = jobs.filter(j => j.clientName.toLowerCase().includes(lowerName));
+    whereClause += ` AND LOWER(client_name) LIKE LOWER($${paramIndex++})`;
+    params.push(`%${filters.clientName}%`);
   }
   
-  return jobs.sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const result = await query<any>(
+    `SELECT * FROM bops.agency_jobs ${whereClause} ORDER BY created_at DESC`,
+    params
   );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    clientName: row.client_name,
+    clientEmail: row.client_email,
+    projectTitle: row.project_title,
+    projectType: row.project_type,
+    vertical: row.vertical,
+    brief: row.brief,
+    budgetCents: row.budget_cents,
+    timeline: row.timeline,
+    status: row.status,
+    currentStage: row.current_stage,
+    assignedTo: row.assigned_to,
+    workflow: row.workflow,
+    sourceAssets: row.source_assets || [],
+    deliverables: row.deliverables || [],
+    approvalGates: row.approval_gates || [],
+    totalCostCents: Number(row.total_cost_cents) || 0,
+    providerUsage: row.provider_usage || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+    notes: row.notes,
+  }));
 }
 
 export async function updateJobStatus(
@@ -125,13 +198,12 @@ export async function updateJobStatus(
   status: JobStatus,
   assignedTo?: string
 ): Promise<void> {
-  const job = jobStore.get(jobId);
-  if (job) {
-    job.status = status;
-    if (assignedTo) job.assignedTo = assignedTo;
-    job.updatedAt = new Date().toISOString();
-    jobStore.set(jobId, job);
-  }
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET status = $1, assigned_to = COALESCE($2, assigned_to), updated_at = NOW()
+     WHERE id = $3`,
+    [status, assignedTo, jobId]
+  );
 }
 
 export async function updateStageStatus(
@@ -140,36 +212,45 @@ export async function updateStageStatus(
   status: StageStatus,
   outputs?: JobAsset[]
 ): Promise<void> {
-  const job = jobStore.get(jobId);
-  if (job) {
-    const stage = job.workflow.find(s => s.botId === botId);
-    if (stage) {
-      stage.status = status;
-      if (outputs) stage.outputs = outputs;
-      job.updatedAt = new Date().toISOString();
-      jobStore.set(jobId, job);
-    }
-  }
+  const job = await getJob(jobId);
+  if (!job) throw new Error('Job not found');
+  
+  const workflow = job.workflow.map(stage => 
+    stage.botId === botId 
+      ? { ...stage, status, ...(outputs ? { outputs } : {}) }
+      : stage
+  );
+  
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET workflow = $1, updated_at = NOW()
+     WHERE id = $2`,
+    [JSON.stringify(workflow), jobId]
+  );
 }
 
 export async function addApprovalGate(
   jobId: string,
   approval: Omit<ApprovalGate, 'id' | 'createdAt'>
 ): Promise<string> {
-  const job = jobStore.get(jobId);
+  const job = await getJob(jobId);
   if (!job) throw new Error('Job not found');
   
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const gate: ApprovalGate = {
     id: approvalId,
     ...approval,
-    status: 'pending',
     createdAt: new Date().toISOString(),
   };
   
-  job.approvalGates.push(gate);
-  job.updatedAt = new Date().toISOString();
-  jobStore.set(jobId, job);
+  const approvalGates = [...job.approvalGates, gate];
+  
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET approval_gates = $1, updated_at = NOW()
+     WHERE id = $2`,
+    [JSON.stringify(approvalGates), jobId]
+  );
   
   return approvalId;
 }
@@ -179,14 +260,21 @@ export async function processApproval(
   approved: boolean,
   feedback?: string
 ): Promise<void> {
-  for (const job of jobStore.values()) {
+  const jobs = await listJobs();
+  
+  for (const job of jobs) {
     const gate = job.approvalGates.find(g => g.id === approvalId);
     if (gate) {
       gate.status = approved ? 'approved' : 'rejected';
       if (feedback) gate.feedback = feedback;
       gate.processedAt = new Date().toISOString();
-      job.updatedAt = new Date().toISOString();
-      jobStore.set(job.id, job);
+      
+      await query(
+        `UPDATE bops.agency_jobs 
+         SET approval_gates = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [JSON.stringify(job.approvalGates), job.id]
+      );
       
       trackServerEvent("bops_approval_processed" as any, {
         approval_id: approvalId,
@@ -205,12 +293,17 @@ export async function addDeliverable(
   jobId: string,
   deliverable: JobAsset
 ): Promise<void> {
-  const job = jobStore.get(jobId);
+  const job = await getJob(jobId);
   if (!job) throw new Error('Job not found');
   
-  job.deliverables.push(deliverable);
-  job.updatedAt = new Date().toISOString();
-  jobStore.set(jobId, job);
+  const deliverables = [...job.deliverables, deliverable];
+  
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET deliverables = $1, updated_at = NOW()
+     WHERE id = $2`,
+    [JSON.stringify(deliverables), jobId]
+  );
 }
 
 export async function trackProviderUsage(
@@ -221,13 +314,20 @@ export async function trackProviderUsage(
   outputs: string[],
   success: boolean
 ): Promise<void> {
-  const job = jobStore.get(jobId);
+  const job = await getJob(jobId);
   if (!job) throw new Error('Job not found');
   
-  job.providerUsage[provider] = (job.providerUsage[provider] || 0) + costCents;
-  job.totalCostCents += costCents;
-  job.updatedAt = new Date().toISOString();
-  jobStore.set(jobId, job);
+  const providerUsage = { ...job.providerUsage };
+  providerUsage[provider] = (providerUsage[provider] || 0) + costCents;
+  
+  const totalCostCents = job.totalCostCents + costCents;
+  
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET provider_usage = $1, total_cost_cents = $2, updated_at = NOW()
+     WHERE id = $3`,
+    [JSON.stringify(providerUsage), totalCostCents, jobId]
+  );
   
   trackServerEvent("bops_provider_usage" as any, {
     job_id: jobId,
@@ -247,6 +347,7 @@ export async function getPendingApprovals(): Promise<Array<{
   estimatedCost?: number;
   createdAt: string;
 }>> {
+  const jobs = await listJobs();
   const approvals: Array<{
     id: string;
     jobId: string;
@@ -257,7 +358,7 @@ export async function getPendingApprovals(): Promise<Array<{
     createdAt: string;
   }> = [];
   
-  for (const job of jobStore.values()) {
+  for (const job of jobs) {
     for (const gate of job.approvalGates) {
       if (gate.status === 'pending') {
         approvals.push({
@@ -279,17 +380,18 @@ export async function getPendingApprovals(): Promise<Array<{
 }
 
 export async function completeJob(jobId: string): Promise<void> {
-  const job = jobStore.get(jobId);
-  if (!job) throw new Error('Job not found');
+  await query(
+    `UPDATE bops.agency_jobs 
+     SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+     WHERE id = $1`,
+    [jobId]
+  );
   
-  job.status = 'completed';
-  job.completedAt = new Date().toISOString();
-  job.updatedAt = new Date().toISOString();
-  jobStore.set(jobId, job);
+  const job = await getJob(jobId);
   
   trackServerEvent("bops_job_completed" as any, {
     job_id: jobId,
-    total_cost_cents: job.totalCostCents,
-    deliverables: job.deliverables.length,
+    total_cost_cents: job?.totalCostCents || 0,
+    deliverables: job?.deliverables.length || 0,
   });
 }

@@ -267,7 +267,7 @@ describe('Product Scoring Engine', () => {
       const info = getScoringFormulaInfo('window_tint_auto');
       const metrics = info.qualityMetrics!;
       
-      const sum = Object.values(metrics).reduce((acc, m) => acc + m.weight, 0);
+      const sum = Object.values(metrics).reduce((acc, m: any) => acc + m.weight, 0);
       expect(sum).toBeCloseTo(1.0, 5);
     });
   });

@@ -1,4 +1,8 @@
 import "server-only";
+import { getLatestSignals } from "./terminal";
+import { createJob } from "./jobs";
+import { dispatchJobToBot } from "./agency-integration";
+import { trackServerEvent } from "./analytics";
 
 /**
  * Installer.report Automated Task Scheduler
@@ -52,7 +56,10 @@ async function runNewsDesk() {
           } as any,
           });
           
-          console.log('[scheduler] Created news job for critical signals');
+          // Dispatch to editor-in-chief bot
+          await dispatchJobToBot(job.id, 'editor-in-chief', 'News Desk');
+          
+          console.log('[scheduler] Created and dispatched news job for critical signals');
         } catch (error) {
           console.error('[scheduler] Failed to create news job:', error);
         }
