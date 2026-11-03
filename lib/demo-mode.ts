@@ -10,7 +10,8 @@ export function isDemoMode(): boolean {
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const hasOrgo = !!process.env.ORGO_API_KEY;
   
-  return !hasOpenAI || !hasOrgo;
+  // Demo only with NO keys at all: any real key set means the real app (and its sign-in).
+  return !hasOpenAI && !hasOrgo;
 }
 
 export function getDemoBots(): Bot[] {
@@ -268,5 +269,45 @@ export function initDemoState() {
       setupAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
     },
     onboardingComplete: true,
+  };
+}
+
+/** /api/usage's answer in demo mode: today's sample usage per demo bot. */
+export function getDemoUsageResponse() {
+  const names = Object.fromEntries(getDemoBots().map((b) => [b.id, b.name]));
+  const byBot: Record<string, { tokens: number; cost: number; operations: number; name: string }> = {};
+  let tokens = 0;
+  let cost = 0;
+  for (const r of getDemoUsageRecords()) {
+    const e = (byBot[r.botId] ??= { tokens: 0, cost: 0, operations: 0, name: names[r.botId] ?? r.botId });
+    e.tokens += r.tokenCount;
+    e.cost += r.estimatedCost;
+    e.operations += 1;
+    tokens += r.tokenCount;
+    cost += r.estimatedCost;
+  }
+  return {
+    workspace: { tokens, cost, operations: getDemoUsageRecords().length, byBot },
+    limits: getDemoWorkspace().usageLimits,
+    alerts: [],
+  };
+}
+
+/** /api/activity's answer in demo mode: the demo team's messages, task and routines. */
+export function getDemoActivityResponse() {
+  const bots = getDemoBots();
+  const name = (id?: string) => bots.find((b) => b.id === id)?.name ?? "Bot";
+  const msgs = getDemoMessages().filter((m) => m.role === "bot");
+  const routines = getDemoRoutines();
+  const sessions = getDemoSessions();
+  return {
+    summary: { totalBots: bots.length, activeSessions: sessions.length, messagesLast24Hours: msgs.length, activeRoutines: routines.length },
+    recentMessages: msgs.map((m) => ({ id: m.id, botId: m.botId!, botName: name(m.botId), text: m.text, createdAt: m.at })),
+    activeSessions: sessions.map((s) => ({ id: s.id, botId: s.botId, botName: name(s.botId), goal: s.goal, startedAt: s.startedAt ?? s.createdAt, status: s.status, runsOn: s.runsOn })),
+    routineActivity: routines.map((r) => ({ routineId: r.id, name: r.title, botId: r.botId, botName: name(r.botId), lastRun: r.lastRunAt, status: r.enabled ? "on" : "off (review first)", nextRun: r.nextRunAt })),
+    botStats: bots.map((b) => {
+      const mine = routines.filter((r) => r.botId === b.id);
+      return { id: b.id, name: b.name, role: b.role, messagesLast7Days: msgs.filter((m) => m.botId === b.id).length, tasksLast7Days: sessions.filter((s) => s.botId === b.id).length, activeRoutines: mine.length, totalRoutines: mine.length };
+    }),
   };
 }

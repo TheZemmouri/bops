@@ -13,6 +13,7 @@ import { loopHere, onPostgres, onRunner, StateLoadError } from "./persist";
 import { relayAfterSignIn, stopRelay } from "./relay";
 import { reattachFreeComputer, stopAllSessions } from "./sessions";
 import { bindSignIn, getState, stateInCloud, stateUser, update } from "./store";
+import { isDemoMode } from "@/lib/demo-mode";
 
 /**
  * Sign in with Orgo: Orgo's device-code flow (orgo-web app/api/cli/auth), the one `orgo login` and
@@ -367,9 +368,8 @@ function loadForKey(key: string, now: boolean): Promise<void> {
  * tries again at once, from the app's Try again).
  */
 export async function authStatus({ retry = false } = {}) {
-  // Demo mode (no API keys): skip sign-in completely
-  const hasKeys = !!process.env.OPENAI_API_KEY && !!process.env.ORGO_API_KEY;
-  if (!hasKeys) {
+  // Demo mode (NO OpenAI and NO Orgo key): skip sign-in. Any real key set: the normal sign-in below.
+  if (isDemoMode()) {
     return {
       signedIn: true,
       user: { id: "demo", name: "Demo User", email: "demo@bops.local" },

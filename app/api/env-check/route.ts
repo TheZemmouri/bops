@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demo-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET() {
   const hasOrgo = !!process.env.ORGO_API_KEY;
   
   return NextResponse.json({
-    demoMode: !hasOpenAI || !hasOrgo,
+    demoMode: isDemoMode(),
     hasOpenAI,
     hasOrgo,
   });

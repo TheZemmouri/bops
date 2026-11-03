@@ -7,12 +7,15 @@ import {
   getActiveAlerts,
 } from "@/lib/server/usage-tracking";
 import { workspaceOf } from "@/lib/types";
+import { getDemoUsageResponse, isDemoMode } from "@/lib/demo-mode";
 
 /**
  * GET /api/usage - Get usage data for a bot or workspace
  */
 export async function GET(request: NextRequest) {
   try {
+    // Demo mode (no keys): sample usage for the demo team.
+    if (isDemoMode()) return NextResponse.json(getDemoUsageResponse());
     const { searchParams } = new URL(request.url);
     const botId = searchParams.get("botId");
     const workspaceId = searchParams.get("workspaceId") || getState().workspace;
