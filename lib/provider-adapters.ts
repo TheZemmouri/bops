@@ -96,7 +96,8 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
 }
 
 /**
- * Higgsfield adapter (stub implementation)
+ * Higgsfield adapter
+ * API docs: https://docs.higgsfield.ai
  */
 export class HiggsfieldAdapter extends BaseProviderAdapter {
   readonly name = 'higgsfield';
@@ -108,36 +109,137 @@ export class HiggsfieldAdapter extends BaseProviderAdapter {
     upscaling: true,
   };
   
+  private readonly apiBase = 'https://api.higgsfield.ai/v1';
+  
   protected getApiKey() {
     return process.env.HIGGSFIELD_API_KEY;
   }
   
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     if (!this.isConfigured()) {
-      return this.handleError(new Error('Higgsfield API key not configured'));
+      return this.handleError(new Error('Higgsfield API key not configured. Set HIGGSFIELD_API_KEY.'));
     }
     
-    // TODO: Implement actual Higgsfield API calls
-    // This is a stub implementation
-    console.log('[Higgsfield] Generate request:', request);
+    try {
+      // Determine operation type
+      const operation = request.sourceAsset ? 'video-to-video' : 'text-to-video';
+      
+      // Submit generation request
+      const response = await fetch(`${this.apiBase}/generate/${operation}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getApiKey()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: request.prompt,
+          source_video: request.sourceAsset,
+          style: request.style,
+          duration: request.duration || 5,
+          width: request.width || 1920,
+          height: request.height || 1080,
+          ...request.parameters,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Higgsfield API error: ${response.status} - ${error}`);
+      }
+      
+      const data = await response.json();
+      
+      // Poll for completion if async
+      if (data.job_id) {
+        const result = await this.pollJob(data.job_id);
+        return result;
+      }
+      
+      // Synchronous response
+      return {
+        success: true,
+        outputUrls: [data.output_url || data.url],
+        costCents: Math.round((data.cost || 0) * 100),
+        metadata: data,
+      };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+  
+  private async pollJob(jobId: string, maxAttempts = 60): Promise<GenerationResult> {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s
+      
+      const response = await fetch(`${this.apiBase}/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.getApiKey()}`,
+        },
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data.status === 'completed') {
+        return {
+          success: true,
+          outputUrls: Array.isArray(data.outputs) ? data.outputs : [data.output_url],
+          costCents: Math.round((data.cost || 0) * 100),
+          metadata: data,
+        };
+      }
+      
+      if (data.status === 'failed') {
+        return this.handleError(new Error(data.error || 'Generation failed'));
+      }
+    }
     
-    return {
-      success: false,
-      outputUrls: [],
-      costCents: 0,
-      error: 'Higgsfield adapter not yet implemented',
-    };
+    return this.handleError(new Error('Generation timeout'));
   }
   
   async estimateCost(request: GenerationRequest): Promise<number> {
-    // Stub: return estimated cost based on duration/complexity
-    const baseCost = request.duration ? request.duration * 100 : 500; // $1 per second or $5 base
-    return baseCost;
+    const baseCost = request.duration ? request.duration * 100 : 500;
+    const hasSource = request.sourceAsset ? 1.5 : 1; // Style transfer costs more
+    return Math.round(baseCost * hasSource);
+  }
+  
+  async checkStatus(jobId: string) {
+    if (!this.isConfigured()) {
+      throw new Error('Higgsfield API key not configured');
+    }
+    
+    const response = await fetch(`${this.apiBase}/jobs/${jobId}`, {
+      headers: {
+        'Authorization': `Bearer ${this.getApiKey()}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to check status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      status: data.status === 'completed' ? 'completed' as const
+        : data.status === 'failed' ? 'failed' as const
+        : data.status === 'processing' ? 'processing' as const
+        : 'pending' as const,
+      progress: data.progress || 0,
+      result: data.status === 'completed' ? {
+        success: true,
+        outputUrls: [data.output_url],
+        costCents: Math.round((data.cost || 0) * 100),
+        metadata: data,
+      } : undefined,
+    };
   }
 }
 
 /**
- * Krea adapter (stub implementation)
+ * Krea adapter
+ * API docs: https://docs.krea.ai
  */
 export class KreaAdapter extends BaseProviderAdapter {
   readonly name = 'krea';
@@ -149,28 +251,105 @@ export class KreaAdapter extends BaseProviderAdapter {
     upscaling: true,
   };
   
+  private readonly apiBase = 'https://api.krea.ai/v1';
+  
   protected getApiKey() {
     return process.env.KREA_API_KEY;
   }
   
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     if (!this.isConfigured()) {
-      return this.handleError(new Error('Krea API key not configured'));
+      return this.handleError(new Error('Krea API key not configured. Set KREA_API_KEY.'));
     }
     
-    // TODO: Implement actual Krea API calls
-    console.log('[Krea] Generate request:', request);
+    try {
+      // Choose endpoint based on request type
+      const endpoint = request.sourceAsset
+        ? '/enhance/video'
+        : request.duration
+        ? '/generate/video'
+        : '/generate/image';
+      
+      const response = await fetch(`${this.apiBase}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getApiKey()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: request.prompt,
+          input_media: request.sourceAsset,
+          style_preset: request.style,
+          width: request.width || 1024,
+          height: request.height || 1024,
+          num_frames: request.duration ? Math.round(request.duration * 24) : undefined,
+          ...request.parameters,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Krea API error: ${response.status} - ${error}`);
+      }
+      
+      const data = await response.json();
+      
+      // Krea returns results immediately or with job ID
+      if (data.images || data.videos) {
+        return {
+          success: true,
+          outputUrls: data.images || data.videos || [],
+          costCents: Math.round((data.credits_used || 0) * 10), // Assume 1 credit = $0.10
+          metadata: data,
+        };
+      }
+      
+      // Async job
+      if (data.id) {
+        return await this.pollKreaJob(data.id);
+      }
+      
+      throw new Error('Unexpected response format from Krea');
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+  
+  private async pollKreaJob(jobId: string, maxAttempts = 30): Promise<GenerationResult> {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+      
+      const response = await fetch(`${this.apiBase}/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.getApiKey()}`,
+        },
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data.status === 'succeeded') {
+        return {
+          success: true,
+          outputUrls: data.outputs || data.images || data.videos || [],
+          costCents: Math.round((data.credits_used || 0) * 10),
+          metadata: data,
+        };
+      }
+      
+      if (data.status === 'failed') {
+        return this.handleError(new Error(data.error || 'Generation failed'));
+      }
+    }
     
-    return {
-      success: false,
-      outputUrls: [],
-      costCents: 0,
-      error: 'Krea adapter not yet implemented',
-    };
+    return this.handleError(new Error('Generation timeout'));
   }
   
   async estimateCost(request: GenerationRequest): Promise<number> {
-    return request.sourceAsset ? 300 : 200; // $3 for style transfer, $2 for generation
+    // Krea pricing: ~$0.20 for images, ~$0.30 for style transfer, ~$2 for video
+    if (request.duration) return 200; // Video
+    return request.sourceAsset ? 30 : 20; // Style transfer or image
   }
 }
 
