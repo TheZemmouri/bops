@@ -16,6 +16,8 @@ export type Bot = {
   role: string;
   color: string;
   isMain: boolean;
+  /** Detailed instructions for this bot's specialized behavior and responsibilities */
+  instructions?: string;
   /** Its own Orgo computer's UUID. A bot with its own computer gets a fork of the main bot's on first use; one that shares has none. */
   computerId?: string;
   /**
@@ -1612,6 +1614,17 @@ export type AppState = {
    */
   procedures?: Procedure[];
   proceduresBackup?: Procedure[];
+  /** Business information collected during onboarding */
+  businessInfo?: {
+    name: string;
+    industry?: string;
+    website?: string;
+    description?: string;
+    templateId?: string;
+    setupAt?: number;
+  };
+  /** Whether initial onboarding has been completed */
+  onboardingComplete?: boolean;
   /**
    * Moving each workspace onto an Orgo workspace of its own (lib/server/workspaces.ts
    * migrateWorkspacesToOrgo): the step it got to, the Orgo workspaces it made (for a rollback), the

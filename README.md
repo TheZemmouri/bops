@@ -123,6 +123,31 @@ Every plan includes a Bops computer: 1 on Free and Pro, up to 3 on Max. On Free 
 
 Running Bops yourself on your own keys? Bops plans don't apply: you pay each provider directly, and your Orgo plan sets how many computers you can run. See [Run it yourself](#run-it-yourself).
 
+## Quick Start for Small Businesses
+
+**New:** Bops now includes industry-specific bot team templates and guided onboarding to get your business up and running in minutes.
+
+### Pre-Built Templates
+
+Choose from ready-made bot teams designed for:
+
+- **🚗 Auto Dealers**: Sales pipeline, inventory tracking, service scheduling
+- **🏠 Roofing & Home Services**: Job coordination, estimates, lead management
+- **🛍️ Local Retail & Restaurants**: Customer engagement, inventory, events
+- **💼 Small Business (General)**: Admin, sales, customer success
+
+Each template includes specialized bots with pre-configured roles, instructions, suggested routines, and recommended app connections.
+
+### Guided Onboarding
+
+First-time setup walks you through:
+1. Business information (name, industry, website)
+2. Template selection (or skip to customize)
+3. Bot team creation and review
+4. Initial configuration
+
+See [SETUP.md](./SETUP.md) for complete setup instructions including required API keys and service accounts.
+
 ## Download
 
 <p>
@@ -132,7 +157,8 @@ Running Bops yourself on your own keys? Bops plans don't apply: you pay each pro
 1. Download Bops from [bops.bot](https://bops.bot). It runs on a Mac with Apple silicon.
 2. Open the DMG and drag Bops to Applications.
 3. Sign in with Google, with your email, or with Orgo. If you don't have an Orgo account yet, one is made for you.
-4. Say hi to Boppy. It takes it from there.
+4. Complete the guided onboarding to set up your bot team, or skip to configure manually.
+5. Say hi to your bots and start delegating work!
 
 Every release is signed with Developer ID and notarized by Apple. When a newer version is out, Bops tells you, along with what's new in it.
 
@@ -182,6 +208,8 @@ The app itself is Electron and Next.js.
 - **Optional:** AgentPhone and a public URL, for texts and calls.
 - **For tasks on your Mac:** Google Chrome. Bops uses your Codex CLI if you have one, or installs it, and never runs it on your ChatGPT account.
 
+**See [SETUP.md](./SETUP.md) for detailed setup instructions including API keys, service accounts, and troubleshooting.**
+
 ### Start it
 
 ```bash
@@ -193,7 +221,7 @@ In `.env.local`, fill in at least `OPENAI_API_KEY` and `OPENAI_EXECUTOR_API_KEY`
 
 Or run the server alone with `npx next dev --port 3210 -H 127.0.0.1` and open http://127.0.0.1:3210. Leave out `-H 127.0.0.1` only when `edge/` or the bots' computers must reach it over your tailnet.
 
-The app opens on sign-in: **Continue with Google**, **Continue with email** or **Sign in with Orgo**. With `BOPS_SELF_HOSTED=1` and `ORGO_API_KEY` set, it skips this and uses your key. Then open **Settings → You** and add your name and a line about yourself: every bot uses it.
+The app opens on sign-in: **Continue with Google**, **Continue with email** or **Sign in with Orgo**. With `BOPS_SELF_HOSTED=1` and `ORGO_API_KEY` set, it skips this and uses your key. Then complete the guided onboarding or skip to manual setup. Open **Settings → You** and add your name and a line about yourself: every bot uses it.
 
 ### Settings
 
