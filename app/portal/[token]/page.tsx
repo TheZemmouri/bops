@@ -6,6 +6,7 @@
  */
 
 import { getJob, getPendingApprovals } from "@/lib/server/jobs";
+import Link from "next/link";
 
 interface PortalJobPageProps {
   params: Promise<{ token: string }>;
@@ -48,12 +49,12 @@ export default async function PortalJobPage({ params }: PortalJobPageProps) {
           <p className="text-gray-600 mb-6">
             This portal link is invalid or has expired. Please check your email for the correct link or contact support.
           </p>
-          <a
-            href="/portal"
+          <Link
+            href="/"
             className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            Return to Portal Home
-          </a>
+            Return Home
+          </Link>
         </div>
       </div>
     );

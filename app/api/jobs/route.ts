@@ -11,8 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
+    const statusParam = searchParams.get('status');
     const params = {
-      status: searchParams.get('status') as any,
+      status: (statusParam as 'intake' | 'strategy' | 'production' | 'review' | 'delivery' | 'completed' | 'cancelled') || undefined,
       vertical: searchParams.get('vertical') || undefined,
       limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined,
       offset: searchParams.get('offset') ? Number(searchParams.get('offset')) : undefined,
