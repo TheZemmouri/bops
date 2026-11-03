@@ -100,13 +100,15 @@ export interface ApprovalGate {
   type: ApprovalType;
   title: string;
   description?: string;
-  assets: JobAsset[];
+  assets?: JobAsset[];
   estimatedCost?: number; // cents
   status: ApprovalStatus;
   approvedBy?: string;
   approvedAt?: string;
   feedback?: string;
   expiresAt?: string;
+  createdAt: string;
+  processedAt?: string;
 }
 
 export interface ProviderUsageRecord {
@@ -123,7 +125,7 @@ export interface ProviderUsageRecord {
 export interface AgencyJob {
   id: string;
   userId: string;
-  workspaceId: string;
+  workspaceId?: string;
   
   // Client info
   clientName: string;

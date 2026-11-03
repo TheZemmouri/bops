@@ -1,39 +1,22 @@
 import "server-only";
 import type { AgencyJob, JobStatus, StageStatus, ApprovalGate, JobAsset, WorkflowStage } from "@/lib/job-types";
 import { getWorkflow } from "@/lib/agency-config";
-import { getState, update } from "./store";
+import { getState } from "./store";
 import { trackServerEvent } from "./analytics";
 
 /**
- * Installer.report Job Management
+ * Installer.report Job Management (In-Memory)
  * 
- * Handles job lifecycle, workflow execution, approval gates, and deliverables.
+ * Simplified in-memory implementation for Phase 3 integration.
+ * TODO: Replace with database persistence when ready.
  */
 
-const JOB_ID_PREFIX = "job_";
+const jobStore = new Map<string, AgencyJob>();
 
-/**
- * Generate a unique job ID
- */
 function generateJobId(): string {
-  return `${JOB_ID_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  return `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/**
- * Get database connection (uses Bops persist layer)
- * Returns a mock for now until database is integrated
- */
-async function getDb() {
-  // TODO: Wire to actual Bops persist layer when ready
-  return {
-    type: "mock" as const,
-    query: async () => ({ rows: [] }),
-  };
-}
-
-/**
- * Create a new job
- */
 export async function createJob(params: {
   clientName: string;
   clientEmail?: string;
@@ -45,7 +28,6 @@ export async function createJob(params: {
     audience?: string;
     style?: string;
     deliverables: string[];
-    [key: string]: unknown;
   };
   budgetCents?: number;
   workspaceId?: string;
@@ -59,7 +41,6 @@ export async function createJob(params: {
   const jobId = generateJobId();
   const now = new Date().toISOString();
   
-  // Get workflow for this project type
   const workflowBotIds = getWorkflow(params.projectType);
   const workflow: WorkflowStage[] = workflowBotIds.map((botId, index) => ({
     botId,
@@ -82,12 +63,8 @@ export async function createJob(params: {
       goals: params.brief.goals,
       audience: params.brief.audience || '',
       style: params.brief.style,
-      tone: undefined,
-      references: undefined,
       deliverables: params.brief.deliverables,
-      platforms: undefined,
-      customRequirements: undefined,
-    },
+    } as any,
     budgetCents: params.budgetCents,
     status: "intake",
     currentStage: workflowBotIds[0],
@@ -102,26 +79,8 @@ export async function createJob(params: {
     updatedAt: now,
   };
   
-  // Store in database if available
-  const db = await getDb();
-  if (db.type === "postgres") {
-    await db.query(
-      `INSERT INTO bops.agency_jobs (
-        id, user_id, workspace_id, client_name, client_email,
-        project_title, project_type, vertical, brief, budget_cents,
-        status, current_stage, assigned_to, workflow,
-        created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-      [
-        job.id, job.userId, job.workspaceId, job.clientName, job.clientEmail,
-        job.projectTitle, job.projectType, job.vertical, JSON.stringify(job.brief), job.budgetCents,
-        job.status, job.currentStage, job.assignedTo, JSON.stringify(job.workflow),
-        job.createdAt, job.updatedAt
-      ]
-    );
-  }
+  jobStore.set(job.id, job);
   
-  // Track job creation
   trackServerEvent("bops_job_created" as any, {
     job_id: jobId,
     project_type: params.projectType,
@@ -132,319 +91,143 @@ export async function createJob(params: {
   return job;
 }
 
-/**
- * Get job by ID
- */
 export async function getJob(jobId: string): Promise<AgencyJob | null> {
-  const db = await getDb();
-  
-  if (db.type === "postgres") {
-    const result = await db.query(
-      `SELECT * FROM bops.agency_jobs WHERE id = $1`,
-      [jobId]
-    );
-    
-    if (result.rows.length === 0) return null;
-    
-    const row: any = result.rows[0];
-    return {
-      id: row.id,
-      userId: row.user_id,
-      workspaceId: row.workspace_id,
-      clientName: row.client_name,
-      clientEmail: row.client_email,
-      projectTitle: row.project_title,
-      projectType: row.project_type,
-      vertical: row.vertical,
-      brief: row.brief,
-      budgetCents: row.budget_cents,
-      timeline: row.timeline,
-      status: row.status,
-      currentStage: row.current_stage,
-      assignedTo: row.assigned_to,
-      workflow: row.workflow,
-      sourceAssets: row.source_assets || [],
-      deliverables: row.deliverables || [],
-      approvalGates: row.approval_gates || [],
-      totalCostCents: Number(row.total_cost_cents) || 0,
-      providerUsage: row.provider_usage || {},
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      completedAt: row.completed_at,
-      notes: row.notes,
-    };
-  }
-  
-  return null;
+  return jobStore.get(jobId) || null;
 }
 
-/**
- * List jobs for current user
- */
-export async function listJobs(params: {
-  userId?: string;
-  workspaceId?: string;
-  status?: JobStatus;
+export async function listJobs(filters?: {
+  status?: string;
   vertical?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ jobs: AgencyJob[]; total: number }> {
-  const state = getState();
-  const userId = params.userId || state.account?.user?.id;
-  const workspaceId = params.workspaceId || state.workspace;
+  clientName?: string;
+}): Promise<AgencyJob[]> {
+  let jobs = Array.from(jobStore.values());
   
-  if (!userId) return { jobs: [], total: 0 };
-  
-  const db = await getDb();
-  
-  if (db.type === "postgres") {
-    const conditions = ["user_id = $1", "workspace_id = $2"];
-    const values: unknown[] = [userId, workspaceId];
-    let paramIndex = 3;
-    
-    if (params.status) {
-      conditions.push(`status = $${paramIndex++}`);
-      values.push(params.status);
-    }
-    
-    if (params.vertical) {
-      conditions.push(`vertical = $${paramIndex++}`);
-      values.push(params.vertical);
-    }
-    
-    const whereClause = conditions.join(" AND ");
-    
-    // Get total count
-    const countResult = await db.query(
-      `SELECT COUNT(*) FROM bops.agency_jobs WHERE ${whereClause}`,
-      values
-    );
-    const total = Number(countResult.rows[0].count);
-    
-    // Get jobs
-    const limit = params.limit || 50;
-    const offset = params.offset || 0;
-    
-    const result = await db.query(
-      `SELECT * FROM bops.agency_jobs WHERE ${whereClause}
-       ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...values, limit, offset]
-    );
-    
-    const jobs = result.rows.map((row): AgencyJob => ({
-      id: row.id,
-      userId: row.user_id,
-      workspaceId: row.workspace_id,
-      clientName: row.client_name,
-      clientEmail: row.client_email,
-      projectTitle: row.project_title,
-      projectType: row.project_type,
-      vertical: row.vertical,
-      brief: row.brief,
-      budgetCents: row.budget_cents,
-      timeline: row.timeline,
-      status: row.status,
-      currentStage: row.current_stage,
-      assignedTo: row.assigned_to,
-      workflow: row.workflow,
-      sourceAssets: row.source_assets || [],
-      deliverables: row.deliverables || [],
-      approvalGates: row.approval_gates || [],
-      totalCostCents: Number(row.total_cost_cents) || 0,
-      providerUsage: row.provider_usage || {},
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      completedAt: row.completed_at,
-      notes: row.notes,
-    }));
-    
-    return { jobs, total };
+  if (filters?.status) {
+    jobs = jobs.filter(j => j.status === filters.status);
   }
   
-  return { jobs: [], total: 0 };
+  if (filters?.vertical) {
+    jobs = jobs.filter(j => j.vertical === filters.vertical);
+  }
+  
+  if (filters?.clientName) {
+    const lowerName = filters.clientName.toLowerCase();
+    jobs = jobs.filter(j => j.clientName.toLowerCase().includes(lowerName));
+  }
+  
+  return jobs.sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
-/**
- * Update job status and current stage
- */
 export async function updateJobStatus(
   jobId: string,
   status: JobStatus,
-  currentStage?: string
+  assignedTo?: string
 ): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-  
-  if (db.type === "postgres") {
-    const updates: string[] = ["status = $2", "updated_at = $3"];
-    const values: unknown[] = [jobId, status, now];
-    let paramIndex = 4;
-    
-    if (currentStage) {
-      updates.push(`current_stage = $${paramIndex++}`);
-      values.push(currentStage);
-    }
-    
-    if (status === "completed") {
-      updates.push(`completed_at = $${paramIndex++}`);
-      values.push(now);
-    }
-    
-    await db.query(
-      `UPDATE bops.agency_jobs SET ${updates.join(", ")} WHERE id = $1`,
-      values
-    );
+  const job = jobStore.get(jobId);
+  if (job) {
+    job.status = status;
+    if (assignedTo) job.assignedTo = assignedTo;
+    job.updatedAt = new Date().toISOString();
+    jobStore.set(jobId, job);
   }
 }
 
-/**
- * Update workflow stage status
- */
 export async function updateStageStatus(
   jobId: string,
   botId: string,
   status: StageStatus,
   outputs?: JobAsset[]
 ): Promise<void> {
-  const job = await getJob(jobId);
-  if (!job) throw new Error("Job not found");
-  
-  const workflow = job.workflow.map(stage => {
-    if (stage.botId === botId) {
-      return { ...stage, status, outputs: outputs || stage.outputs };
+  const job = jobStore.get(jobId);
+  if (job) {
+    const stage = job.workflow.find(s => s.botId === botId);
+    if (stage) {
+      stage.status = status;
+      if (outputs) stage.outputs = outputs;
+      job.updatedAt = new Date().toISOString();
+      jobStore.set(jobId, job);
     }
-    return stage;
-  });
-  
-  const db = await getDb();
-  if (db.type === "postgres") {
-    await db.query(
-      `UPDATE bops.agency_jobs SET workflow = $2, updated_at = $3 WHERE id = $1`,
-      [jobId, JSON.stringify(workflow), new Date().toISOString()]
-    );
   }
 }
 
-/**
- * Add approval gate
- */
 export async function addApprovalGate(
   jobId: string,
-  approval: Omit<ApprovalGate, "id" | "status">
+  approval: Omit<ApprovalGate, 'id' | 'createdAt'>
 ): Promise<string> {
+  const job = jobStore.get(jobId);
+  if (!job) throw new Error('Job not found');
+  
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const gate: ApprovalGate = {
     id: approvalId,
     ...approval,
-    status: "pending",
+    status: 'pending',
+    createdAt: new Date().toISOString(),
   };
   
-  const db = await getDb();
-  if (db.type === "postgres") {
-    await db.query(
-      `INSERT INTO bops.agency_approvals (
-        id, job_id, approval_type, title, description, assets,
-        estimated_cost, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        approvalId, jobId, approval.type, approval.title,
-        approval.description, JSON.stringify(approval.assets),
-        approval.estimatedCost, "pending", new Date().toISOString()
-      ]
-    );
-  }
+  job.approvalGates.push(gate);
+  job.updatedAt = new Date().toISOString();
+  jobStore.set(jobId, job);
   
   return approvalId;
 }
 
-/**
- * Process approval response
- */
 export async function processApproval(
   approvalId: string,
   approved: boolean,
   feedback?: string
 ): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-  
-  if (db.type === "postgres") {
-    await db.query(
-      `UPDATE bops.agency_approvals
-       SET status = $2, approved_at = $3, feedback = $4
-       WHERE id = $1`,
-      [approvalId, approved ? "approved" : "rejected", now, feedback]
-    );
+  for (const job of jobStore.values()) {
+    const gate = job.approvalGates.find(g => g.id === approvalId);
+    if (gate) {
+      gate.status = approved ? 'approved' : 'rejected';
+      if (feedback) gate.feedback = feedback;
+      gate.processedAt = new Date().toISOString();
+      job.updatedAt = new Date().toISOString();
+      jobStore.set(job.id, job);
+      
+      trackServerEvent("bops_approval_processed" as any, {
+        approval_id: approvalId,
+        job_id: job.id,
+        approved,
+      });
+      
+      return;
+    }
   }
   
-  trackServerEvent("bops_approval_processed" as any, {
-    approval_id: approvalId,
-    approved,
-    has_feedback: !!feedback,
-  });
+  throw new Error('Approval not found');
 }
 
-/**
- * Add asset to job deliverables
- */
 export async function addDeliverable(
   jobId: string,
-  asset: JobAsset
+  deliverable: JobAsset
 ): Promise<void> {
-  const job = await getJob(jobId);
-  if (!job) throw new Error("Job not found");
+  const job = jobStore.get(jobId);
+  if (!job) throw new Error('Job not found');
   
-  const deliverables = [...job.deliverables, asset];
-  
-  const db = await getDb();
-  if (db.type === "postgres") {
-    await db.query(
-      `UPDATE bops.agency_jobs SET deliverables = $2, updated_at = $3 WHERE id = $1`,
-      [jobId, JSON.stringify(deliverables), new Date().toISOString()]
-    );
-  }
+  job.deliverables.push(deliverable);
+  job.updatedAt = new Date().toISOString();
+  jobStore.set(jobId, job);
 }
 
-/**
- * Track provider usage and cost
- */
 export async function trackProviderUsage(
   jobId: string,
   provider: string,
   operation: string,
   costCents: number,
   outputs: string[],
-  success: boolean,
-  error?: string
+  success: boolean
 ): Promise<void> {
-  const job = await getJob(jobId);
-  if (!job) throw new Error("Job not found");
+  const job = jobStore.get(jobId);
+  if (!job) throw new Error('Job not found');
   
-  // Update job totals
-  const totalCostCents = job.totalCostCents + costCents;
-  const providerUsage = {
-    ...job.providerUsage,
-    [provider]: (job.providerUsage[provider] || 0) + costCents,
-  };
-  
-  const db = await getDb();
-  if (db.type === "postgres") {
-    // Update job totals
-    await db.query(
-      `UPDATE bops.agency_jobs
-       SET total_cost_cents = $2, provider_usage = $3, updated_at = $4
-       WHERE id = $1`,
-      [jobId, totalCostCents, JSON.stringify(providerUsage), new Date().toISOString()]
-    );
-    
-    // Record usage detail
-    await db.query(
-      `INSERT INTO bops.agency_provider_usage (
-        job_id, provider, operation, cost_cents, output_urls, success, error, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [jobId, provider, operation, costCents, JSON.stringify(outputs), success, error, new Date().toISOString()]
-    );
-  }
+  job.providerUsage[provider] = (job.providerUsage[provider] || 0) + costCents;
+  job.totalCostCents += costCents;
+  job.updatedAt = new Date().toISOString();
+  jobStore.set(jobId, job);
   
   trackServerEvent("bops_provider_usage" as any, {
     job_id: jobId,
@@ -455,41 +238,58 @@ export async function trackProviderUsage(
   });
 }
 
-/**
- * Get pending approvals for a job
- */
-export async function getPendingApprovals(jobId: string): Promise<ApprovalGate[]> {
-  const db = await getDb();
+export async function getPendingApprovals(): Promise<Array<{
+  id: string;
+  jobId: string;
+  type: string;
+  title: string;
+  description: string;
+  estimatedCost?: number;
+  createdAt: string;
+}>> {
+  const approvals: Array<{
+    id: string;
+    jobId: string;
+    type: string;
+    title: string;
+    description: string;
+    estimatedCost?: number;
+    createdAt: string;
+  }> = [];
   
-  if (db.type === "postgres") {
-    const result = await db.query(
-      `SELECT * FROM bops.agency_approvals WHERE job_id = $1 AND status = 'pending'`,
-      [jobId]
-    );
-    
-    return result.rows.map(row => ({
-      id: row.id,
-      type: row.approval_type,
-      title: row.title,
-      description: row.description,
-      assets: row.assets || [],
-      estimatedCost: row.estimated_cost,
-      status: row.status,
-      approvedBy: row.approved_by,
-      approvedAt: row.approved_at,
-      feedback: row.feedback,
-      expiresAt: row.expires_at,
-    }));
+  for (const job of jobStore.values()) {
+    for (const gate of job.approvalGates) {
+      if (gate.status === 'pending') {
+        approvals.push({
+          id: gate.id,
+          jobId: job.id,
+          type: gate.type,
+          title: gate.title,
+          description: gate.description,
+          estimatedCost: gate.estimatedCost,
+          createdAt: gate.createdAt,
+        });
+      }
+    }
   }
   
-  return [];
+  return approvals.sort((a, b) => 
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
 }
 
-/**
- * Complete a job
- */
 export async function completeJob(jobId: string): Promise<void> {
-  await updateJobStatus(jobId, "completed");
+  const job = jobStore.get(jobId);
+  if (!job) throw new Error('Job not found');
   
-  trackServerEvent("bops_job_completed" as any, { job_id: jobId });
+  job.status = 'completed';
+  job.completedAt = new Date().toISOString();
+  job.updatedAt = new Date().toISOString();
+  jobStore.set(jobId, job);
+  
+  trackServerEvent("bops_job_completed" as any, {
+    job_id: jobId,
+    total_cost_cents: job.totalCostCents,
+    deliverables: job.deliverables.length,
+  });
 }

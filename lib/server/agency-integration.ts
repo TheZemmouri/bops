@@ -217,6 +217,7 @@ export async function createJobApproval(
     type: estimatedCost ? 'spend' : 'deliverable',
     title,
     description,
+    status: 'pending',
     assets: [],
     estimatedCost,
   });
