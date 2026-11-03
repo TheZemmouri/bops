@@ -77,21 +77,21 @@ export async function POST(request: NextRequest) {
     const workspaceId = getState().workspace;
 
     for (const botTemplate of template.bots) {
-      const result = await createBot(
+      const botResult = await createBot(
         botTemplate.name,
         botTemplate.role,
         workspaceId,
         false // shared computer by default
       );
 
-      if ("error" in result) {
-        console.error(`Failed to create bot ${botTemplate.name}:`, result.error);
+      if ("error" in botResult) {
+        console.error(`Failed to create bot ${botTemplate.name}:`, botResult.error);
         continue;
       }
 
       // Set bot instructions
       update((state) => {
-        const bot = state.bots.find((b) => b.id === result.botId);
+        const bot = state.bots.find((b) => b.id === botResult.botId);
         if (bot) {
           bot.instructions = botTemplate.instructions;
         }
@@ -107,16 +107,26 @@ export async function POST(request: NextRequest) {
             // Parse schedule (simple format for now)
             const schedule = parseSchedule(routineTemplate.schedule);
             
-            await createRoutine({
-              botId: result.botId,
-              title: routineTemplate.name,
-              goal: routineTemplate.description,
+            const routineResult = createRoutine(
+              botResult.botId,
+              routineTemplate.name,
+              routineTemplate.description,
               schedule,
-              run: routineTemplate.type === "task" ? "task" : "chat",
-              enabled: false, // Start disabled, user can enable
-            });
+              {
+                run: routineTemplate.type === "task" ? "task" : "chat",
+              }
+            );
             
-            routinesCreated++;
+            if (routineResult.routine) {
+              routinesCreated++;
+              // Disable by default so user can enable them
+              update((state) => {
+                const routine = state.routines.find((r) => r.id === routineResult.routine!.id);
+                if (routine) {
+                  routine.enabled = false;
+                }
+              });
+            }
           } catch (error) {
             console.error(`Failed to create routine ${routineTemplate.name}:`, error);
           }
@@ -124,7 +134,7 @@ export async function POST(request: NextRequest) {
       }
 
       createdBots.push({
-        id: result.botId,
+        id: botResult.botId,
         name: botTemplate.name,
         role: botTemplate.role,
         routines: routinesCreated,
