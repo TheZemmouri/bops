@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Create the bot team
-    const createdBots: Array<{ id: string; name: string; role: string }> = [];
+    const createdBots: Array<{ id: string; name: string; role: string; routines: number }> = [];
     const workspaceId = getState().workspace;
 
     for (const botTemplate of template.bots) {
@@ -89,12 +89,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      createdBots.push({
-        id: result.botId,
-        name: botTemplate.name,
-        role: botTemplate.role,
-      });
-
       // Set bot instructions
       update((state) => {
         const bot = state.bots.find((b) => b.id === result.botId);
@@ -102,7 +96,114 @@ export async function POST(request: NextRequest) {
           bot.instructions = botTemplate.instructions;
         }
       });
+
+      // Create suggested routines for this bot
+      let routinesCreated = 0;
+      if (botTemplate.suggestedRoutines) {
+        const { createRoutine } = await import("@/lib/server/routines");
+        
+        for (const routineTemplate of botTemplate.suggestedRoutines) {
+          try {
+            // Parse schedule (simple format for now)
+            const schedule = parseSchedule(routineTemplate.schedule);
+            
+            await createRoutine({
+              botId: result.botId,
+              title: routineTemplate.name,
+              goal: routineTemplate.description,
+              schedule,
+              run: routineTemplate.type === "task" ? "task" : "chat",
+              enabled: false, // Start disabled, user can enable
+            });
+            
+            routinesCreated++;
+          } catch (error) {
+            console.error(`Failed to create routine ${routineTemplate.name}:`, error);
+          }
+        }
+      }
+
+      createdBots.push({
+        id: result.botId,
+        name: botTemplate.name,
+        role: botTemplate.role,
+        routines: routinesCreated,
+      });
     }
+
+// Helper to parse schedule strings
+function parseSchedule(scheduleStr: string): any {
+  // Simple parser for common schedule formats
+  // "Daily at 8:00 AM" -> every day at 8am
+  // "Weekdays at 10:00 AM" -> Monday-Friday at 10am
+  // "Mondays at 9:00 AM" -> Every Monday at 9am
+  // "Every 2 hours, 8 AM to 10 PM" -> every 2 hours in range
+  
+  const lowerStr = scheduleStr.toLowerCase();
+  
+  // Parse time
+  const timeMatch = scheduleStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  let hour = 9;
+  let minute = 0;
+  
+  if (timeMatch) {
+    hour = parseInt(timeMatch[1]);
+    minute = parseInt(timeMatch[2]);
+    if (timeMatch[3].toUpperCase() === "PM" && hour !== 12) {
+      hour += 12;
+    } else if (timeMatch[3].toUpperCase() === "AM" && hour === 12) {
+      hour = 0;
+    }
+  }
+  
+  if (lowerStr.includes("every") && lowerStr.includes("hour")) {
+    // "Every 2 hours"
+    const hoursMatch = lowerStr.match(/every\s+(\d+)\s+hour/);
+    const hours = hoursMatch ? parseInt(hoursMatch[1]) : 2;
+    return {
+      kind: "every" as const,
+      minutes: hours * 60,
+    };
+  }
+  
+  if (lowerStr.includes("weekday")) {
+    // "Weekdays at 10:00 AM"
+    return {
+      kind: "week" as const,
+      days: [1, 2, 3, 4, 5], // Monday-Friday
+      hour,
+      minute,
+    };
+  }
+  
+  if (lowerStr.includes("monday") || lowerStr.includes("tuesday") || 
+      lowerStr.includes("wednesday") || lowerStr.includes("thursday") ||
+      lowerStr.includes("friday") || lowerStr.includes("saturday") || 
+      lowerStr.includes("sunday")) {
+    const dayMap: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6
+    };
+    
+    const days = Object.entries(dayMap)
+      .filter(([day]) => lowerStr.includes(day))
+      .map(([, num]) => num);
+    
+    return {
+      kind: "week" as const,
+      days,
+      hour,
+      minute,
+    };
+  }
+  
+  // Default: daily at specified time
+  return {
+    kind: "day" as const,
+    hour,
+    minute,
+  };
+}
 
     // Mark onboarding as complete
     update((state) => {

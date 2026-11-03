@@ -18,6 +18,12 @@ export type Bot = {
   isMain: boolean;
   /** Detailed instructions for this bot's specialized behavior and responsibilities */
   instructions?: string;
+  /** Bot is paused (won't accept new work) due to limits or manual pause */
+  paused?: boolean;
+  /** Reason bot was paused */
+  pausedReason?: string;
+  /** When bot was paused */
+  pausedAt?: number;
   /** Its own Orgo computer's UUID. A bot with its own computer gets a fork of the main bot's on first use; one that shares has none. */
   computerId?: string;
   /**
@@ -374,6 +380,14 @@ export type Workspace = {
   computerNames?: Record<string, string>;
   /** The site each of its bots works on, by bot id (BotSite, read with siteOf). None for a bot that works on none. */
   botSites?: Record<string, BotSite>;
+  /** Usage and cost limits for this workspace */
+  usageLimits?: {
+    tokensPerBotPerDay?: number;
+    costPerBotPerDay?: number;
+    tokensPerWorkspacePerDay?: number;
+    costPerWorkspacePerDay?: number;
+    alertThreshold?: number;
+  };
 };
 
 /** A login switched on in a workspace (Workspace.loginsOn): when. */
@@ -1625,6 +1639,28 @@ export type AppState = {
   };
   /** Whether initial onboarding has been completed */
   onboardingComplete?: boolean;
+  /** Usage records for cost and token tracking */
+  usageRecords?: Array<{
+    botId: string;
+    workspaceId: string;
+    timestamp: number;
+    tokenCount: number;
+    estimatedCost: number;
+    model?: string;
+    operation: "chat" | "task" | "routine" | "call" | "other";
+  }>;
+  /** Usage alerts (limits reached or approaching) */
+  usageAlerts?: Array<{
+    id: string;
+    botId?: string;
+    workspaceId: string;
+    type: "cost" | "tokens";
+    threshold: number;
+    current: number;
+    limit: number;
+    timestamp: number;
+    dismissed?: boolean;
+  }>;
   /**
    * Moving each workspace onto an Orgo workspace of its own (lib/server/workspaces.ts
    * migrateWorkspacesToOrgo): the step it got to, the Orgo workspaces it made (for a rollback), the
