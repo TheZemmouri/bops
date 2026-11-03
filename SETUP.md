@@ -2,6 +2,55 @@
 
 Complete guide to getting Bops running for the first time, whether self-hosted or using Bops Cloud.
 
+## 🎯 Demo Mode (No API Keys Required)
+
+Bops includes a **Demo Mode** that lets you explore the full application without configuring any API keys or external services. Perfect for:
+- Evaluating Bops before committing  
+- Testing the UI and workflows
+- Understanding how bots, routines, and dashboards work
+
+### Running in Demo Mode
+
+1. **Clone and install dependencies:**
+   ```bash
+   git clone https://github.com/TheZemmouri/bops.git
+   cd bops
+   npm install
+   ```
+
+2. **Start without any `.env.local` file:**
+   ```bash
+   npm run dev
+   ```
+
+3. **Open** http://localhost:3000
+
+That's it! The app will:
+- Automatically detect no API keys are present
+- Bypass authentication
+- Load with realistic demo bots, messages, and routines
+- Show all features in an exploratory state
+
+Demo mode includes:
+- **3 pre-configured bots**: Boppy (main), Sales Manager, Inventory Tracker  
+- **Sample conversations** and active sessions
+- **4 scheduled routines** ready to test
+- **Activity Dashboard** with 7-day performance stats
+- **Usage Dashboard** with cost tracking and alerts
+- **12 industry templates** available in onboarding
+
+### Transitioning from Demo to Production
+
+When you're ready to use Bops with real services:
+1. Copy `.env.example` to `.env.local`
+2. Add your API keys (see "Required API Keys" below)
+3. Restart the dev server
+4. Complete onboarding to configure your team
+
+The app automatically detects API keys and switches from demo mode to full operation.
+
+---
+
 ## Quick Start
 
 ```bash
