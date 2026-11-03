@@ -1647,6 +1647,8 @@ export type AppState = {
   connecting?: AppConnecting[];
   /** Where the user added bots like a teammate: a Slack channel, a Telegram bot, a Discord bot (lib/server/channels.ts). */
   channels?: ChannelLink[];
+  /** Installer.report: Maps agency bot IDs to actual Bops bot IDs */
+  agencyBotMappings?: Record<string, string>;
   /** Actions a bot wants to take that change something (send, create, pay): waiting for the user, or answered a moment ago. Shared by every Bops of the user's (AppApproval). */
   appApprovals?: AppApproval[];
   /** Teams the user keeps apart, and the one they're looking at. */

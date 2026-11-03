@@ -1,0 +1,285 @@
+{
+  "verticals": {
+    "window_tint_auto": {
+      "name": "Automotive Window Tint",
+      "description": "Window tinting films for automotive applications",
+      "scoring": {
+        "formula": {
+          "quality": 0.40,
+          "sentiment": 0.35,
+          "value": 0.25
+        },
+        "quality_metrics": {
+          "ir_rejection": { "weight": 0.28, "unit": "%", "higherIsBetter": true },
+          "tser": { "weight": 0.22, "unit": "%", "higherIsBetter": true },
+          "uv_protection": { "weight": 0.15, "unit": "%", "higherIsBetter": true },
+          "optical_clarity": { "weight": 0.12, "unit": "subjective", "higherIsBetter": true },
+          "install_handling": { "weight": 0.13, "unit": "subjective", "higherIsBetter": true },
+          "color_stability": { "weight": 0.10, "unit": "subjective", "higherIsBetter": true }
+        },
+        "sentiment_sources": [
+          "installer_reviews",
+          "field_feedback",
+          "warranty_claims",
+          "social_mentions"
+        ],
+        "value_calculation": "performance_score / (msrp / 100)"
+      },
+      "product_attributes": [
+        "vlt_shades",
+        "manufacturer",
+        "series_name",
+        "msrp_per_sqft",
+        "warranty_years",
+        "construction_type",
+        "dyed_metallic_ceramic"
+      ]
+    },
+    "window_tint_residential": {
+      "name": "Residential Window Tint",
+      "description": "Window films for residential applications",
+      "scoring": {
+        "formula": {
+          "quality": 0.40,
+          "sentiment": 0.30,
+          "value": 0.30
+        },
+        "quality_metrics": {
+          "tser": { "weight": 0.30, "unit": "%", "higherIsBetter": true },
+          "uv_protection": { "weight": 0.25, "unit": "%", "higherIsBetter": true },
+          "glare_reduction": { "weight": 0.20, "unit": "%", "higherIsBetter": true },
+          "clarity": { "weight": 0.15, "unit": "subjective", "higherIsBetter": true },
+          "install_ease": { "weight": 0.10, "unit": "subjective", "higherIsBetter": true }
+        }
+      }
+    },
+    "window_tint_commercial": {
+      "name": "Commercial Window Tint",
+      "description": "Window films for commercial buildings",
+      "scoring": {
+        "formula": {
+          "quality": 0.45,
+          "sentiment": 0.25,
+          "value": 0.30
+        },
+        "quality_metrics": {
+          "tser": { "weight": 0.35, "unit": "%", "higherIsBetter": true },
+          "uv_protection": { "weight": 0.20, "unit": "%", "higherIsBetter": true },
+          "longevity": { "weight": 0.20, "unit": "years", "higherIsBetter": true },
+          "appearance": { "weight": 0.15, "unit": "subjective", "higherIsBetter": true },
+          "install_speed": { "weight": 0.10, "unit": "subjective", "higherIsBetter": true }
+        }
+      }
+    },
+    "ppf": {
+      "name": "Paint Protection Film (PPF)",
+      "description": "Clear protective films for automotive paint",
+      "scoring": {
+        "formula": {
+          "quality": 0.45,
+          "sentiment": 0.35,
+          "value": 0.20
+        },
+        "quality_metrics": {
+          "self_healing": { "weight": 0.25, "unit": "subjective", "higherIsBetter": true },
+          "clarity": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "yellowing_resistance": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "stain_resistance": { "weight": 0.15, "unit": "subjective", "higherIsBetter": true },
+          "install_ease": { "weight": 0.12, "unit": "subjective", "higherIsBetter": true },
+          "edge_adhesion": { "weight": 0.08, "unit": "subjective", "higherIsBetter": true }
+        },
+        "product_attributes": [
+          "thickness_mil",
+          "warranty_years",
+          "self_healing_type",
+          "gloss_matte"
+        ]
+      }
+    },
+    "windshield_film": {
+      "name": "Windshield Protection Film",
+      "description": "Protective films specifically for windshields",
+      "scoring": {
+        "formula": {
+          "quality": 0.50,
+          "sentiment": 0.30,
+          "value": 0.20
+        },
+        "quality_metrics": {
+          "optical_clarity": { "weight": 0.35, "unit": "subjective", "higherIsBetter": true },
+          "impact_resistance": { "weight": 0.30, "unit": "subjective", "higherIsBetter": true },
+          "wiper_compatibility": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "install_difficulty": { "weight": 0.15, "unit": "subjective", "higherIsBetter": false }
+        }
+      }
+    },
+    "vinyl_wrap": {
+      "name": "Vinyl Wrap",
+      "description": "Color change and decorative vinyl wraps",
+      "scoring": {
+        "formula": {
+          "quality": 0.40,
+          "sentiment": 0.40,
+          "value": 0.20
+        },
+        "quality_metrics": {
+          "conformability": { "weight": 0.25, "unit": "subjective", "higherIsBetter": true },
+          "color_accuracy": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "durability": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "glue_quality": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "air_release": { "weight": 0.15, "unit": "subjective", "higherIsBetter": true }
+        },
+        "product_attributes": [
+          "finish_type",
+          "color_family",
+          "film_width",
+          "warranty_years"
+        ]
+      }
+    },
+    "ceramic_coating": {
+      "name": "Ceramic Coating",
+      "description": "Ceramic coatings and nano-ceramic sealants",
+      "scoring": {
+        "formula": {
+          "quality": 0.45,
+          "sentiment": 0.35,
+          "value": 0.20
+        },
+        "quality_metrics": {
+          "hydrophobicity": { "weight": 0.25, "unit": "contact_angle", "higherIsBetter": true },
+          "gloss_enhancement": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "longevity": { "weight": 0.20, "unit": "months", "higherIsBetter": true },
+          "scratch_resistance": { "weight": 0.18, "unit": "subjective", "higherIsBetter": true },
+          "ease_of_application": { "weight": 0.12, "unit": "subjective", "higherIsBetter": true },
+          "curing_time": { "weight": 0.05, "unit": "hours", "higherIsBetter": false }
+        }
+      }
+    },
+    "detailing": {
+      "name": "Detailing Products",
+      "description": "General detailing products and consumables",
+      "scoring": {
+        "formula": {
+          "quality": 0.35,
+          "sentiment": 0.40,
+          "value": 0.25
+        },
+        "quality_metrics": {
+          "effectiveness": { "weight": 0.40, "unit": "subjective", "higherIsBetter": true },
+          "ease_of_use": { "weight": 0.30, "unit": "subjective", "higherIsBetter": true },
+          "finish_quality": { "weight": 0.20, "unit": "subjective", "higherIsBetter": true },
+          "scent": { "weight": 0.10, "unit": "subjective", "higherIsBetter": true }
+        }
+      }
+    }
+  },
+  "horizontals": {
+    "news": {
+      "name": "Industry News",
+      "workflow": "industryNews",
+      "content_types": [
+        "product_launches",
+        "supplier_announcements",
+        "regulatory_changes",
+        "tradeshow_coverage",
+        "industry_trends",
+        "installer_spotlights"
+      ]
+    },
+    "product_scoring": {
+      "name": "Product Scoring & Reviews",
+      "workflow": "productReview",
+      "output_format": {
+        "overall_score": "0-100 scaled to 5 stars",
+        "category_breakdown": "quality/sentiment/value percentages",
+        "metric_details": "individual metric scores",
+        "vlt_shade_table": "per-shade scores for tint products",
+        "installer_sentiment": "aggregated field feedback",
+        "value_analysis": "price-to-performance ratio"
+      }
+    },
+    "terminal": {
+      "name": "Terminal with Live Signals",
+      "signal_types": [
+        "pricing_changes",
+        "stock_availability",
+        "new_products",
+        "regulatory_updates",
+        "market_trends",
+        "installer_demand",
+        "supplier_issues"
+      ],
+      "refresh_frequency": "real-time or hourly",
+      "voice": "quantitative analyst, Bloomberg-terminal style"
+    },
+    "education": {
+      "name": "Education Library",
+      "content_types": [
+        "installation_guides",
+        "product_knowledge",
+        "business_operations",
+        "marketing_for_shops",
+        "regulatory_compliance",
+        "technique_tutorials"
+      ],
+      "formats": [
+        "ebooks",
+        "video_tutorials",
+        "checklists",
+        "templates"
+      ]
+    },
+    "marketing_services": {
+      "name": "Installer Marketing Services",
+      "workflow": "shopMarketingPackage",
+      "deliverables": [
+        "social_media_content_packages",
+        "before_after_showcases",
+        "website_content",
+        "google_business_optimization",
+        "seasonal_campaigns",
+        "email_templates"
+      ]
+    },
+    "supplier_ads": {
+      "name": "Supplier Advertising & Partnerships",
+      "workflow": "supplierOnboarding",
+      "ad_products": [
+        "featured_supplier_profiles",
+        "sponsored_reviews",
+        "terminal_data_access",
+        "installer_lead_generation",
+        "banner_display_ads",
+        "newsletter_sponsorships"
+      ]
+    },
+    "lead_gen": {
+      "name": "Installer Lead Generation",
+      "service": "Connect installers with local customers seeking services",
+      "verticals_served": [
+        "window_tint_auto",
+        "window_tint_residential",
+        "window_tint_commercial",
+        "ppf",
+        "vinyl_wrap",
+        "ceramic_coating",
+        "detailing"
+      ]
+    }
+  },
+  "localization": {
+    "supported_languages": [
+      { "code": "en", "name": "English", "path": "/" },
+      { "code": "fr", "name": "French", "path": "/fr/" }
+    ],
+    "terminology": {
+      "window_tint": { "fr": "film teinté" },
+      "ppf": { "fr": "film de protection de peinture" },
+      "vinyl_wrap": { "fr": "pellicule de vinyle" },
+      "ceramic_coating": { "fr": "revêtement céramique" },
+      "installer": { "fr": "installateur" },
+      "vlt": { "fr": "VLT", "note": "universal abbreviation" }
+    }
+  }
+}
