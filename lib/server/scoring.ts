@@ -188,13 +188,13 @@ export function batchScoreProducts(
  * Get vertical scoring formula info
  */
 export function getScoringFormulaInfo(vertical: string) {
-  const config = getVerticalConfig(vertical);
+  const config: any = getVerticalConfig(vertical);
   
   return {
     vertical: config.name,
     formula: config.scoring?.formula,
     qualityMetrics: config.scoring?.quality_metrics,
-    sentimentSources: config.scoring?.sentiment_sources,
+    sentimentSources: config.scoring?.sentiment_sources || [],
   };
 }
 
