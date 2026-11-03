@@ -1,5 +1,4 @@
 import "server-only";
-import verticalTemplates from "@/lib/vertical-templates.json";
 
 /**
  * Installer.report Product Database Seeder

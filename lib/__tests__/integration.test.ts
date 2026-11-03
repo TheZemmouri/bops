@@ -8,7 +8,6 @@ import {
   createJob,
   getJob,
   updateStageStatus,
-  addApprovalGate,
   processApproval,
   addDeliverable,
   trackProviderUsage,
@@ -38,8 +37,8 @@ jest.mock('../server/store', () => ({
   })),
   update: jest.fn((fn) => {
     // Mock update - just call the function
-    const mockState: any = {
-      agencyBotMappings: {},
+    const mockState = {
+      agencyBotMappings: {} as Record<string, string>,
     };
     fn(mockState);
   }),
@@ -53,7 +52,7 @@ jest.mock('../server/store', () => ({
 
 // Mock Bops bot creation
 jest.mock('../server/bots', () => ({
-  createBot: jest.fn((name, role) => ({
+  createBot: jest.fn((name) => ({
     botId: `bot-${name.toLowerCase().replace(/\s+/g, '-')}`,
     chatId: `chat-${name.toLowerCase().replace(/\s+/g, '-')}`,
   })),

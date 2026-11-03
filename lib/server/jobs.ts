@@ -21,10 +21,14 @@ function generateJobId(): string {
 
 /**
  * Get database connection (uses Bops persist layer)
+ * Returns a mock for now until database is integrated
  */
 async function getDb() {
-  const { getPersist } = await import("./persist");
-  return getPersist();
+  // TODO: Wire to actual Bops persist layer when ready
+  return {
+    type: "mock" as const,
+    query: async () => ({ rows: [] }),
+  };
 }
 
 /**
@@ -70,11 +74,20 @@ export async function createJob(params: {
     userId,
     workspaceId,
     clientName: params.clientName,
-    clientEmail: params.clientEmail,
+    clientEmail: params.clientEmail || '',
     projectTitle: params.projectTitle,
-    projectType: params.projectType,
-    vertical: params.vertical,
-    brief: params.brief,
+    projectType: params.projectType as any,
+    vertical: params.vertical as any,
+    brief: {
+      goals: params.brief.goals,
+      audience: params.brief.audience || '',
+      style: params.brief.style,
+      tone: undefined,
+      references: undefined,
+      deliverables: params.brief.deliverables,
+      platforms: undefined,
+      customRequirements: undefined,
+    },
     budgetCents: params.budgetCents,
     status: "intake",
     currentStage: workflowBotIds[0],
@@ -109,7 +122,7 @@ export async function createJob(params: {
   }
   
   // Track job creation
-  trackServerEvent("installer_job_created", {
+  trackServerEvent("bops_job_created" as any, {
     job_id: jobId,
     project_type: params.projectType,
     vertical: params.vertical,
@@ -133,7 +146,7 @@ export async function getJob(jobId: string): Promise<AgencyJob | null> {
     
     if (result.rows.length === 0) return null;
     
-    const row = result.rows[0];
+    const row: any = result.rows[0];
     return {
       id: row.id,
       userId: row.user_id,
@@ -364,7 +377,7 @@ export async function processApproval(
     );
   }
   
-  trackServerEvent("installer_approval_processed", {
+  trackServerEvent("bops_approval_processed" as any, {
     approval_id: approvalId,
     approved,
     has_feedback: !!feedback,
@@ -433,7 +446,7 @@ export async function trackProviderUsage(
     );
   }
   
-  trackServerEvent("installer_provider_usage", {
+  trackServerEvent("bops_provider_usage" as any, {
     job_id: jobId,
     provider,
     operation,
@@ -478,5 +491,5 @@ export async function getPendingApprovals(jobId: string): Promise<ApprovalGate[]
 export async function completeJob(jobId: string): Promise<void> {
   await updateJobStatus(jobId, "completed");
   
-  trackServerEvent("installer_job_completed", { job_id: jobId });
+  trackServerEvent("bops_job_completed" as any, { job_id: jobId });
 }

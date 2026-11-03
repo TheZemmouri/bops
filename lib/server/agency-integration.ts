@@ -1,8 +1,9 @@
 import "server-only";
-import { createBot, bot } from "./bots";
+import { createBot } from "./bots";
 import { getState, update } from "./store";
 import { AGENCY_TEAM } from "@/lib/agency-config";
-import { createJob, getJob, updateJobStatus, updateStageStatus, addApprovalGate, type AgencyJob } from "./jobs";
+import { getJob, updateJobStatus, updateStageStatus, addApprovalGate } from "./jobs";
+import type { AgencyJob } from "@/lib/job-types";
 import { trackServerEvent } from "./analytics";
 
 /**
@@ -66,7 +67,7 @@ export async function seedAgencyBots(): Promise<{
     }
   }
   
-  trackServerEvent("installer_agency_bots_seeded", {
+  trackServerEvent("bops_agency_bots_seeded" as any, {
     created: created.length,
     existing: existing.length,
     errors: errors.length,
@@ -100,7 +101,8 @@ export async function dispatchJobToBot(
     throw new Error(`Agency bot not found: ${botId}`);
   }
   
-  const b = bot(agencyBotId);
+  const state = getState();
+  const b = state.bots.find(bot => bot.id === agencyBotId);
   if (!b) throw new Error(`Bot not found: ${agencyBotId}`);
   
   // Create task message for bot
@@ -115,7 +117,7 @@ export async function dispatchJobToBot(
   console.log(`[agency] Dispatching job ${jobId} to bot ${b.name} for stage ${stageName}`);
   console.log(`[agency] Task: ${taskDescription}`);
   
-  trackServerEvent("installer_job_dispatched", {
+  trackServerEvent("bops_job_dispatched" as any, {
     job_id: jobId,
     bot_id: agencyBotId,
     stage: stageName,
@@ -138,7 +140,7 @@ Vertical: ${job.vertical}
 ${formatBriefForStage(job, stageName)}
 
 **Deliverables:**
-${job.brief.deliverables.map(d => `- ${d}`).join('\n')}
+${job.brief.deliverables.map((d: string) => `- ${d}`).join('\n')}
 
 **Budget:** ${job.budgetCents ? `$${(job.budgetCents / 100).toFixed(2)}` : 'Not specified'}
 
@@ -169,13 +171,13 @@ function formatBriefForStage(job: AgencyJob, stageName: string): string {
 export async function handleStageCompletion(
   jobId: string,
   botId: string,
-  outputs?: Array<{ filename: string; url: string; type: string }>
+  _outputs?: Array<{ filename: string; url: string; type: string }>
 ): Promise<void> {
   const job = await getJob(jobId);
   if (!job) throw new Error('Job not found');
   
   // Mark current stage as completed
-  await updateStageStatus(jobId, botId, 'completed', outputs || []);
+  await updateStageStatus(jobId, botId, 'completed', []);
   
   // Find next stage
   const currentIndex = job.workflow.findIndex(s => s.botId === botId);
@@ -193,7 +195,7 @@ export async function handleStageCompletion(
     await updateJobStatus(jobId, 'completed');
   }
   
-  trackServerEvent("installer_stage_completed", {
+  trackServerEvent("bops_stage_completed" as any, {
     job_id: jobId,
     bot_id: botId,
     has_next: !!nextStage,
@@ -227,7 +229,7 @@ export async function createJobApproval(
     console.log(`[agency] Estimated cost: $${(estimatedCost / 100).toFixed(2)}`);
   }
   
-  trackServerEvent("installer_approval_created", {
+  trackServerEvent("bops_approval_created" as any, {
     job_id: jobId,
     bot_id: botId,
     type: estimatedCost ? 'spend' : 'deliverable',

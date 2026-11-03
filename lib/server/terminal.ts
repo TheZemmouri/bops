@@ -76,27 +76,26 @@ async function fetchRSSFeed(url: string): Promise<Signal[]> {
     
     // Simple XML parsing (in production, use a proper XML parser)
     const signals: Signal[] = [];
-    const itemRegex = /<item>(.*?)<\/item>/gs;
-    const titleRegex = /<title>(.*?)<\/title>/s;
-    const linkRegex = /<link>(.*?)<\/link>/s;
-    const descRegex = /<description>(.*?)<\/description>/s;
-    const dateRegex = /<pubDate>(.*?)<\/pubDate>/s;
+    // Note: Using String.match with global flag instead of RegExp with 's' flag
+    const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
     
-    let match;
-    while ((match = itemRegex.exec(xml)) !== null) {
-      const item = match[1];
-      
-      const titleMatch = titleRegex.exec(item);
-      const linkMatch = linkRegex.exec(item);
-      const descMatch = descRegex.exec(item);
-      const dateMatch = dateRegex.exec(item);
+    for (const item of items) {
+      const titleMatch = item.match(/<title>([\s\S]*?)<\/title>/);
+      const linkMatch = item.match(/<link>([\s\S]*?)<\/link>/);
+      const descMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+      const dateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
       
       if (titleMatch) {
+        const title = titleMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1").trim();
+        const description = descMatch 
+          ? descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1").replace(/<[^>]*>/g, "").trim() 
+          : "";
+        
         signals.push({
           id: `signal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           type: "market_trend",
-          title: titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/s, "$1").trim(),
-          description: descMatch ? descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/s, "$1").replace(/<[^>]*>/g, "").trim() : "",
+          title,
+          description,
           source: new URL(url).hostname,
           sourceUrl: linkMatch ? linkMatch[1].trim() : undefined,
           timestamp: dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
