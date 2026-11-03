@@ -321,8 +321,8 @@ export class ElevenLabsAdapter extends BaseProviderAdapter {
     };
   }
   
-  async estimateCost(request: GenerationRequest): Promise<number> {
-    const characters = request.prompt.length;
+  async estimateCost(_request: GenerationRequest): Promise<number> {
+    const characters = _request.prompt.length;
     return Math.ceil(characters / 100) * 10; // ~$0.10 per 100 characters
   }
 }

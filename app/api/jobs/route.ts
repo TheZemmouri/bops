@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * TODO: Implement actual job management using lib/job-types.ts and database
  */
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // TODO: List jobs for current user/workspace
   // Query params: status, vertical, limit, offset
   
