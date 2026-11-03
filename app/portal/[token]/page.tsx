@@ -27,7 +27,7 @@ async function getJobByToken(token: string) {
     // TODO: Validate token hash against job
     // For now, just return job
     
-    const approvals = await getPendingApprovals(jobId);
+    const approvals = await getPendingApprovals();
     
     return { job, approvals };
   } catch (error) {

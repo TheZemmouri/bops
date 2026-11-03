@@ -265,7 +265,7 @@ export async function getPendingApprovals(): Promise<Array<{
           jobId: job.id,
           type: gate.type,
           title: gate.title,
-          description: gate.description,
+          description: gate.description || '',
           estimatedCost: gate.estimatedCost,
           createdAt: gate.createdAt,
         });

@@ -46,15 +46,10 @@ async function runNewsDesk() {
             projectTitle: `Industry News Update - ${new Date().toISOString().split('T')[0]}`,
             projectType: 'industryNews',
             vertical: 'window_tint_auto',
-            brief: {
-              goals: 'Publish latest industry news and critical signals',
-              deliverables: ['News article', 'Social posts'],
-              signals: criticalSignals.map(s => ({
-                title: s.title,
-                description: s.description,
-                source: s.source,
-              })),
-            },
+          brief: {
+            goals: `Publish latest industry news: ${criticalSignals.map(s => s.title).join(', ')}`,
+            deliverables: ['News article', 'Social posts'],
+          } as any,
           });
           
           console.log('[scheduler] Created news job for critical signals');

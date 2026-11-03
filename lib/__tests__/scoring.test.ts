@@ -228,7 +228,7 @@ describe('Product Scoring Engine', () => {
         value: 0.25,
       });
       expect(info.qualityMetrics).toBeDefined();
-      expect(info.qualityMetrics?.ir_rejection.weight).toBe(0.28);
+      expect((info.qualityMetrics as any)?.ir_rejection.weight).toBe(0.28);
     });
     
     it('should return formula info for PPF', () => {
