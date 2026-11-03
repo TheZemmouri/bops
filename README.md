@@ -125,26 +125,48 @@ Running Bops yourself on your own keys? Bops plans don't apply: you pay each pro
 
 ## Quick Start for Small Businesses
 
-**New:** Bops now includes industry-specific bot team templates and guided onboarding to get your business up and running in minutes.
+**New:** Bops now includes industry-specific bot team templates, guided onboarding, automatic routine creation, and usage controls to get your business up and running in minutes with cost protection.
 
-### Pre-Built Templates
+### Pre-Built Templates (12 Industries)
 
 Choose from ready-made bot teams designed for:
 
 - **🚗 Auto Dealers**: Sales pipeline, inventory tracking, service scheduling
 - **🏠 Roofing & Home Services**: Job coordination, estimates, lead management
-- **🛍️ Local Retail & Restaurants**: Customer engagement, inventory, events
+- **🏘️ Real Estate**: Client management, listings, transaction coordination
+- **🦷 Dental & Medical**: Scheduling, insurance, patient follow-up
+- **🛡️ Insurance Agency**: Policy management, claims, client retention
+- **⚖️ Law Office**: Client intake, case management, document coordination
+- **📈 Marketing Agency**: Campaigns, content, client reporting
+- **🔧 Auto Repair**: Service coordination, parts, shop operations
+- **🧹 Cleaning Service**: Booking, scheduling, quality management
+- **🍽️ Restaurant**: Reservations, online orders, inventory
+- **🛍️ Local Retail**: Customer engagement, inventory, events
 - **💼 Small Business (General)**: Admin, sales, customer success
 
-Each template includes specialized bots with pre-configured roles, instructions, suggested routines, and recommended app connections.
+Each template includes specialized bots with detailed instructions (500+ chars), suggested routines that auto-create on setup, and recommended app connections.
 
-### Guided Onboarding
+### Guided Onboarding & Features
 
 First-time setup walks you through:
 1. Business information (name, industry, website)
-2. Template selection (or skip to customize)
+2. Template selection (auto-matches from description or choose manually)
 3. Bot team creation and review
-4. Initial configuration
+4. **Automatic routine creation** - Suggested routines created (disabled by default for review)
+5. Initial configuration with graceful degradation if services unavailable
+
+**Usage & Cost Controls:**
+- Set per-bot and workspace daily token/cost limits
+- Real-time usage tracking with cost estimates
+- Automatic alerts at 80% of limit
+- Auto-pause bots when limits reached
+- Dashboard showing usage by bot and operation type
+
+**Activity Dashboard:**
+- See what each bot is doing in real-time
+- Track messages, tasks, and routine runs
+- Per-bot performance metrics
+- Usage and cost breakdown
 
 See [SETUP.md](./SETUP.md) for complete setup instructions including required API keys and service accounts.
 

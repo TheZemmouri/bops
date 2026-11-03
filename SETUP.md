@@ -207,11 +207,12 @@ You can skip onboarding and set up manually if preferred.
 
 After setup is complete:
 
-1. **Configure Bots**: Review each bot's instructions and customize as needed
-2. **Set Up Routines**: Enable suggested routines or create your own
-3. **Connect Apps**: Add Gmail, Calendar, Sheets, etc. in the Vault
-4. **Test Tasks**: Give your bots simple tasks to verify everything works
-5. **Monitor Activity**: Check the Activity Dashboard to see what your bots are doing
+1. **Review Auto-Created Routines**: Onboarding created suggested routines (disabled by default) - review and enable the ones you want
+2. **Set Usage Limits**: Configure per-bot or workspace daily token/cost limits in Settings to control spending
+3. **Configure Bots**: Review each bot's instructions and customize as needed
+4. **Connect Apps**: Add Gmail, Calendar, Sheets, etc. in the Vault
+5. **Test Tasks**: Give your bots simple tasks to verify everything works
+6. **Monitor Activity & Costs**: Check the Activity Dashboard and Usage Dashboard to track what bots are doing and costs
 
 ## Getting Help
 
