@@ -243,20 +243,39 @@ export function generateSampleSignal(type: SignalType, vertical: string): Signal
 export async function getLatestSignals(params?: {
   vertical?: string;
   limit?: number;
+  includeSamples?: boolean; // For testing/demo
 }): Promise<Signal[]> {
   const signals = await aggregateSignals({
     vertical: params?.vertical,
     limit: params?.limit || 20,
   });
   
-  // If no signals from RSS, return sample signals for demo
-  if (signals.length === 0) {
-    return [
+  // If no signals from RSS and samples requested, add sample signals
+  // Clearly marked as samples in metadata
+  if (signals.length === 0 && params?.includeSamples !== false) {
+    console.warn('[terminal] No live signals available, using sample data');
+    
+    const samples = [
       generateSampleSignal("product_launch", params?.vertical || "window_tint_auto"),
       generateSampleSignal("market_trend", params?.vertical || "ppf"),
       generateSampleSignal("availability", params?.vertical || "vinyl_wrap"),
     ];
+    
+    // Mark as sample data
+    for (const sample of samples) {
+      sample.metadata = { ...sample.metadata, isSampleData: true };
+      sample.title = `[SAMPLE] ${sample.title}`;
+    }
+    
+    return samples;
   }
   
   return signals;
+}
+
+/**
+ * Check if signal is sample data
+ */
+export function isSampleSignal(signal: Signal): boolean {
+  return signal.metadata?.isSampleData === true || signal.title.startsWith('[SAMPLE]');
 }
