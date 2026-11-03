@@ -3,7 +3,8 @@
 import { APPS_NAME, appsOwnShown, appsShown } from "@/lib/apps-access";
 import { screenMap } from "@/lib/screens";
 import { chatAsks } from "@/lib/asks";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DemoProvider, useDemo, withDemoBots } from "./demo-shell";
 import { accountIn, botChatId, BRAINS_ON, isScreenWatch, live, sharesComputer, siteBotOf, siteLoginIn, workBot, workspaceOf, type AppState, type Host, type Session, type Watch } from "@/lib/types";
 import { appCoders, copyBotOf } from "@/lib/hosted-apps";
 import { initialsOf, PlanAndCredit, UsageSection } from "./account";
@@ -110,7 +111,17 @@ function chime() {
  * the app, as it opens.
  */
 export function BopsApp() {
-  const state = useAppState();
+  return (
+    <DemoProvider>
+      <BopsAppInner />
+    </DemoProvider>
+  );
+}
+
+function BopsAppInner() {
+  const demo = useDemo();
+  const raw = useAppState();
+  const state = useMemo(() => withDemoBots(raw, demo), [raw, demo]) as typeof raw;
   const [auth, recheck, retry] = useAuthStatus(state?.account?.signedInAt);
   useAnalytics(state);
   const pick = useSizePick(auth && !auth.needsSignIn && !auth.cloudProblem ? state : null);

@@ -1,3 +1,4 @@
+import { getDemoActivityResponse, isDemoMode } from "@/lib/demo-mode";
 import { NextResponse } from "next/server";
 import { getState } from "@/lib/server/store";
 import { live, type Session, type Routine } from "@/lib/types";
@@ -7,6 +8,8 @@ import { live, type Session, type Routine } from "@/lib/types";
  */
 export async function GET() {
   try {
+    // Demo mode (no keys): the demo team's sample activity.
+    if (isDemoMode()) return NextResponse.json(getDemoActivityResponse());
     const state = getState();
     const now = Date.now();
     const last24Hours = now - 24 * 60 * 60 * 1000;

@@ -8,6 +8,7 @@ import { AutopilotButton, AutopilotSections, type AutopilotOpen } from "./autopi
 import { categoriesOpen } from "@/lib/memory-categories";
 import { KeyIcon } from "./screen-cards";
 import { TeamCount, teamWords, useMembersCount } from "./members";
+import { DemoSidebarNav } from "./demo-shell";
 import { FooterButton, footerPillOf, useFooterHover, useLastPill, type FooterKey, type FooterPage } from "./sidebar-footer";
 import { AppsIcon } from "./made-apps";
 import { KnowledgeIcon, useKnowledgeNews, type MemoryOpen } from "./memory-categories";
@@ -346,6 +347,8 @@ export function Sidebar({
       {!state.shared && <MailAddressStep state={state} />}
       {/* A notice from Orgo, one at a time, a card here too (notice-popup.tsx). */}
       <NoticeCard />
+      {/* Demo mode only: set up a business, Activity and Usage (demo-shell.tsx). */}
+      <DemoSidebarNav />
       {/* You (Team is in your menu), then your logins (the Vault, with the apps you've connected), Routines, Knowledge and the apps your bots made (sidebar-footer.tsx). New bots are the + at the top. */}
       <SidebarFooter
         state={state}
