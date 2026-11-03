@@ -109,10 +109,10 @@ export async function POST(request: NextRequest) {
       state.onboardingComplete = true;
     });
 
-    trackServerEvent("bops_onboarding_completed", {
-      template_id: template.id,
-      bots_created: createdBots.length,
-      has_website: !!website,
+    // Track onboarding completion (using bot_created event for now)
+    trackServerEvent("bops_bot_created", {
+      own_computer: false,
+      workspace_bots: createdBots.length,
     });
 
     return NextResponse.json({
