@@ -41,26 +41,31 @@ export const dynamic = "force-dynamic";
  * With a workspace shared with the user open, it's that workspace's state, read only (lib/server/shared.ts).
  */
 export async function GET(request: Request) {
-  ensureCloud();
-  startMail();
-  startPhone();
-  startChannels();
-  startComputerChecks();
-  startActivityBeat();
-  startRunsOn();
-  startBopsSync();
-  startRunnerInstalls();
-  startProjectBinding();
-  startMadeAppsSync();
-  startCrmSync();
-  startPrivacy();
-  retryHeldRenameOnStart();
-  // Your Apps at Read for everyone already shared with, once per workspace, as soon as the state is here: before the
-  // People sheet can show them unset (workspaces.ts giveAppsRead; a look at a few workspaces once it's done).
-  try {
-    giveAppsRead();
-  } catch (e) {
-    console.warn(`[state] Your Apps at Read: ${(e as Error).message}`);
+  // Skip service initialization when running without API keys (demo mode)
+  const hasKeys = !!process.env.OPENAI_API_KEY && !!process.env.ORGO_API_KEY;
+  
+  if (hasKeys) {
+    ensureCloud();
+    startMail();
+    startPhone();
+    startChannels();
+    startComputerChecks();
+    startActivityBeat();
+    startRunsOn();
+    startBopsSync();
+    startRunnerInstalls();
+    startProjectBinding();
+    startMadeAppsSync();
+    startCrmSync();
+    startPrivacy();
+    retryHeldRenameOnStart();
+    // Your Apps at Read for everyone already shared with, once per workspace, as soon as the state is here: before the
+    // People sheet can show them unset (workspaces.ts giveAppsRead; a look at a few workspaces once it's done).
+    try {
+      giveAppsRead();
+    } catch (e) {
+      console.warn(`[state] Your Apps at Read: ${(e as Error).message}`);
+    }
   }
   const have = new URL(request.url).searchParams.get("v");
   // A workspace shared with the user is open: its state in place of their own workspace's, never theirs (lib/server/shared.ts).

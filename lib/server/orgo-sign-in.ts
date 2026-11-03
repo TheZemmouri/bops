@@ -367,6 +367,17 @@ function loadForKey(key: string, now: boolean): Promise<void> {
  * tries again at once, from the app's Try again).
  */
 export async function authStatus({ retry = false } = {}) {
+  // Demo mode (no API keys): skip sign-in completely
+  const hasKeys = !!process.env.OPENAI_API_KEY && !!process.env.ORGO_API_KEY;
+  if (!hasKeys) {
+    return {
+      signedIn: true,
+      user: { id: "demo", name: "Demo User", email: "demo@bops.local" },
+      needsSignIn: false,
+      cloudProblem: false,
+    };
+  }
+  
   const key = await loadOrgoKey();
   // A runner asks Orgo's profile and loads its state from Bops Cloud with what Bops Cloud takes (its key file while it can't take identity yet).
   if (key && !signedInUser()) await loadForKey(signInKey() ?? key, retry);
